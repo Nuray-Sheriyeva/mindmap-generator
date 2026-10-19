@@ -1,0 +1,238 @@
+{
+  "document": {
+    "filename": "photosynthesis-primer.pdf",
+    "pages": 8,
+    "language": "en",
+    "title": "Photosynthesis"
+  },
+  "mindmap": {
+    "id": "root",
+    "label": "Photosynthesis",
+    "summary": "Photosynthesis converts light energy into chemical energy, stores it as sugar, and releases oxygen. The document follows the process from light capture through the Calvin cycle to real-world applications.",
+    "source_pages": [1, 2],
+    "children": [
+      {
+        "id": "root.1",
+        "label": "Introduction",
+        "summary": "Photosynthesis is the process plants, algae and some bacteria use to turn light into chemical energy.",
+        "source_pages": [1, 2],
+        "children": [
+          {
+            "id": "root.1.1",
+            "label": "Definition",
+            "summary": "Light energy is captured and converted into chemical bonds inside the chloroplast.",
+            "source_pages": [1],
+            "children": [
+              {
+                "id": "root.1.1.1",
+                "label": "Energy conversion",
+                "summary": "Solar energy becomes chemical energy stored in carbohydrates.",
+                "source_pages": [1],
+                "children": []
+              },
+              {
+                "id": "root.1.1.2",
+                "label": "Carbon fixation",
+                "summary": "Carbon dioxide from the air is incorporated into organic molecules.",
+                "source_pages": [1],
+                "children": []
+              }
+            ]
+          },
+          {
+            "id": "root.1.2",
+            "label": "Why it matters",
+            "summary": "Photosynthesis supplies oxygen and forms the base of most food chains on Earth.",
+            "source_pages": [2],
+            "children": [
+              {
+                "id": "root.1.2.1",
+                "label": "Oxygen production",
+                "summary": "Water splitting releases the oxygen that aerobic life depends on.",
+                "source_pages": [2],
+                "children": []
+              },
+              {
+                "id": "root.1.2.2",
+                "label": "Food chains",
+                "summary": "Organic carbon produced by photosynthesis feeds consumers.",
+                "source_pages": [2],
+                "children": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "root.2",
+        "label": "Light Reactions",
+        "summary": "Light-dependent reactions take place in the thylakoid membrane and generate ATP, NADPH and oxygen.",
+        "source_pages": [2, 3],
+        "children": [
+          {
+            "id": "root.2.1",
+            "label": "Thylakoid membrane",
+            "summary": "Pigments and protein complexes in the thylakoid membrane capture photons.",
+            "source_pages": [2],
+            "children": [
+              {
+                "id": "root.2.1.1",
+                "label": "Electron transport",
+                "summary": "Excited electrons move through a chain of carriers that pumps protons.",
+                "source_pages": [3],
+                "children": []
+              }
+            ]
+          },
+          {
+            "id": "root.2.2",
+            "label": "Water splitting",
+            "summary": "Water molecules are split to replace electrons lost by chlorophyll.",
+            "source_pages": [3],
+            "children": [
+              {
+                "id": "root.2.2.1",
+                "label": "Oxygen release",
+                "summary": "Oxygen is released as a by-product of water splitting.",
+                "source_pages": [3],
+                "children": []
+              }
+            ]
+          },
+          {
+            "id": "root.2.3",
+            "label": "ATP and NADPH",
+            "summary": "The light reactions provide the energy carriers used by the Calvin cycle.",
+            "source_pages": [3],
+            "children": []
+          }
+        ]
+      },
+      {
+        "id": "root.3",
+        "label": "Calvin Cycle",
+        "summary": "The light-independent Calvin cycle fixes carbon dioxide into sugar using ATP and NADPH.",
+        "source_pages": [4, 5],
+        "children": [
+          {
+            "id": "root.3.1",
+            "label": "Carbon fixation",
+            "summary": "RuBisCO attaches carbon dioxide to a five-carbon sugar.",
+            "source_pages": [4],
+            "children": [
+              {
+                "id": "root.3.1.1",
+                "label": "RuBisCO",
+                "summary": "RuBisCO is the enzyme that catalyses the first step of carbon fixation.",
+                "source_pages": [4],
+                "children": []
+              }
+            ]
+          },
+          {
+            "id": "root.3.2",
+            "label": "Sugar production",
+            "summary": "Reduction and regeneration steps produce glucose and rebuild the starting material.",
+            "source_pages": [5],
+            "children": [
+              {
+                "id": "root.3.2.1",
+                "label": "Glucose",
+                "summary": "Fixed carbon is assembled into glucose and other carbohydrates.",
+                "source_pages": [5],
+                "children": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "root.4",
+        "label": "Chloroplast Anatomy",
+        "summary": "The chloroplast contains the membranes and compartments where photosynthesis takes place.",
+        "source_pages": [5, 6],
+        "children": [
+          {
+            "id": "root.4.1",
+            "label": "Stroma",
+            "summary": "The stroma is the fluid-filled space where the Calvin cycle runs.",
+            "source_pages": [5],
+            "children": []
+          },
+          {
+            "id": "root.4.2",
+            "label": "Thylakoid stacks",
+            "summary": "Stacked thylakoids increase the membrane area available for light capture.",
+            "source_pages": [6],
+            "children": [
+              {
+                "id": "root.4.2.1",
+                "label": "Grana",
+                "summary": "Grana are the stacks of thylakoid discs inside the chloroplast.",
+                "source_pages": [6],
+                "children": []
+              }
+            ]
+          },
+          {
+            "id": "root.4.3",
+            "label": "Chlorophyll",
+            "summary": "Chlorophyll absorbs mainly blue and red wavelengths of light.",
+            "source_pages": [6],
+            "children": []
+          }
+        ]
+      },
+      {
+        "id": "root.5",
+        "label": "Applications",
+        "summary": "Insights from photosynthesis research inform agriculture and renewable energy technologies.",
+        "source_pages": [7, 8],
+        "children": [
+          {
+            "id": "root.5.1",
+            "label": "Agriculture",
+            "summary": "Understanding photosynthesis helps improve crop productivity.",
+            "source_pages": [7],
+            "children": [
+              {
+                "id": "root.5.1.1",
+                "label": "Crop yields",
+                "summary": "Optimising light use and carbon fixation can raise crop yields.",
+                "source_pages": [7],
+                "children": []
+              }
+            ]
+          },
+          {
+            "id": "root.5.2",
+            "label": "Renewable energy",
+            "summary": "Artificial systems aim to mimic photosynthesis for fuel production.",
+            "source_pages": [8],
+            "children": [
+              {
+                "id": "root.5.2.1",
+                "label": "Artificial photosynthesis",
+                "summary": "Researchers design devices that use light to make chemical fuels.",
+                "source_pages": [8],
+                "children": []
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "meta": {
+    "model": "mock-heuristic-v1",
+    "generated_at": "2025-01-15T10:30:00Z",
+    "node_count": 29,
+    "depth": 3,
+    "cache_hit": false,
+    "repair_attempts": 0,
+    "generation_path": "single_call",
+    "output_language": "en",
+    "processing_ms": 1240,
+    "fixes": []
+  }
+}
