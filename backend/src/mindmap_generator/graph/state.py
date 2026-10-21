@@ -6,8 +6,9 @@ from typing import TypedDict
 
 STAGE_SEQUENCE: tuple[str, ...] = (
     "parse_pdf",
+    "classify_sections",
     "chunk_document",
-    "summarize_chunks",
+    "extract_concepts",
     "build_hierarchy",
     "validate_and_repair",
     "finalize",
@@ -16,10 +17,11 @@ STAGE_SEQUENCE: tuple[str, ...] = (
 STAGE_LABELS: dict[str, str] = {
     "queued": "Queued",
     "parse_pdf": "Parsing PDF",
-    "chunk_document": "Chunking document",
-    "summarize_chunks": "Summarizing sections",
-    "build_hierarchy": "Building hierarchy",
-    "validate_and_repair": "Validating mind map",
+    "classify_sections": "Classifying sections",
+    "chunk_document": "Chunking content",
+    "extract_concepts": "Extracting concepts",
+    "build_hierarchy": "Clustering ideas",
+    "validate_and_repair": "Validating map",
     "finalize": "Finalizing",
 }
 
@@ -34,11 +36,7 @@ def stage_position(stage: str | None) -> tuple[int, int, float]:
 
 
 class PipelineState(TypedDict, total=False):
-    """Mutable state passed between graph nodes.
-
-    Large binary input is only present at the start; the final result is the
-    only value consumed by the API layer.
-    """
+    """Mutable state passed between graph nodes."""
 
     job_id: str
     pdf_bytes: bytes
@@ -46,11 +44,15 @@ class PipelineState(TypedDict, total=False):
     options: dict
     document: dict
     sections: list[dict]
+    objectives: list[str]
+    page_texts: dict[int, str]
     chunks: list[dict]
-    chunk_summaries: list[dict]
-    draft: dict
+    concepts: list[dict]
+    cluster: dict
     mindmap: dict
     validation_errors: list[str]
+    repair_errors_by_id: dict[str, list[str]]
+    repair_target: str
     fixes: list[str]
     warnings: list[str]
     repair_attempts: int

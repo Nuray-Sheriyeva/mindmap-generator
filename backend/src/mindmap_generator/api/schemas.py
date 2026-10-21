@@ -60,4 +60,5 @@ class HealthResponse(BaseModel):
     environment: str
     llm_provider: str
     llm_model: str
+    llm_configured: bool = True
     cache_enabled: bool

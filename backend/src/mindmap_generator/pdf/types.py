@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 
 from pydantic import BaseModel, Field
 
+from ..models import SectionKind
+
 
 @dataclass(slots=True)
 class RawLine:
@@ -61,7 +63,7 @@ class DocumentSection(BaseModel):
 
     ``text`` is the cleaned body (the heading itself is excluded), while
     ``blocks`` retains the page mapping used for precise source-page refs when
-    chunking long sections.
+    chunking long sections. ``kind`` is filled in by the classification stage.
     """
 
     title: str
@@ -70,6 +72,7 @@ class DocumentSection(BaseModel):
     page_end: int
     text: str = ""
     blocks: list[PageText] = Field(default_factory=list)
+    kind: SectionKind = "content"
 
 
 class ParsedDocument(BaseModel):

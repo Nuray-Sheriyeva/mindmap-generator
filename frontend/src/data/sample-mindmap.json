@@ -1,238 +1,510 @@
 {
   "document": {
-    "filename": "photosynthesis-primer.pdf",
-    "pages": 8,
+    "filename": "lesson-large-language-models.pdf",
+    "pages": 7,
     "language": "en",
-    "title": "Photosynthesis"
+    "title": "Large Language Models (LLMs)"
   },
   "mindmap": {
-    "id": "root",
-    "label": "Photosynthesis",
-    "summary": "Photosynthesis converts light energy into chemical energy, stores it as sugar, and releases oxygen. The document follows the process from light capture through the Calvin cycle to real-world applications.",
-    "source_pages": [1, 2],
+    "kind": "root",
+    "label": "Large Language Models (LLMs)",
+    "source_pages": [],
     "children": [
       {
-        "id": "root.1",
-        "label": "Introduction",
-        "summary": "Photosynthesis is the process plants, algae and some bacteria use to turn light into chemical energy.",
-        "source_pages": [1, 2],
+        "kind": "branch",
+        "label": "Overview and Definition",
+        "source_pages": [],
         "children": [
           {
-            "id": "root.1.1",
+            "kind": "leaf",
             "label": "Definition",
-            "summary": "Light energy is captured and converted into chemical bonds inside the chloroplast.",
-            "source_pages": [1],
+            "explanation": "An LLM is an AI system trained on large collections of data so it can process and generate language.",
+            "source_pages": [
+              2
+            ],
+            "children": [],
+            "id": "root.1.1"
+          },
+          {
+            "kind": "leaf",
+            "label": "Capabilities",
+            "explanation": "LLMs answer questions, summarize documents, draft text, translate, explain ideas, and assist with some coding tasks.",
+            "source_pages": [
+              2
+            ],
+            "children": [],
+            "id": "root.1.2"
+          },
+          {
+            "kind": "leaf",
+            "label": "Mental Model",
+            "explanation": "An LLM is a powerful pattern-learning and text-generation system, not an infallible expert or a human mind.",
+            "source_pages": [
+              2
+            ],
+            "children": [],
+            "id": "root.1.3"
+          }
+        ],
+        "id": "root.1"
+      },
+      {
+        "kind": "branch",
+        "label": "Core Concepts",
+        "source_pages": [],
+        "children": [
+          {
+            "kind": "leaf",
+            "label": "Tokens",
+            "explanation": "Tokens are units of text processing—words, parts of words, or symbols—that the model reads and predicts.",
+            "source_pages": [
+              2
+            ],
+            "children": [],
+            "id": "root.2.1"
+          },
+          {
+            "kind": "leaf",
+            "label": "Parameters",
+            "explanation": "Parameters are learned numerical values inside a model that are adjusted during training.",
+            "source_pages": [
+              2
+            ],
+            "children": [],
+            "id": "root.2.2"
+          },
+          {
+            "kind": "leaf",
+            "label": "Context Window",
+            "explanation": "The context window is the amount of tokenized information a model can consider at one time.",
+            "source_pages": [
+              2
+            ],
+            "children": [],
+            "id": "root.2.3"
+          },
+          {
+            "kind": "leaf",
+            "label": "Transformer Architecture",
+            "explanation": "Most modern LLMs use the Transformer, a neural network architecture built around attention.",
+            "source_pages": [
+              3
+            ],
+            "children": [],
+            "id": "root.2.4"
+          },
+          {
+            "kind": "leaf",
+            "label": "Attention",
+            "explanation": "Attention is a mechanism that helps the model weigh relationships between tokens in context.",
+            "source_pages": [
+              3
+            ],
+            "children": [],
+            "id": "root.2.5"
+          },
+          {
+            "kind": "leaf",
+            "label": "Next-Token Prediction",
+            "explanation": "The model estimates likely next tokens from the preceding context and generates a sequence step by step.",
+            "source_pages": [
+              3
+            ],
+            "children": [],
+            "id": "root.2.6"
+          }
+        ],
+        "id": "root.2"
+      },
+      {
+        "kind": "branch",
+        "label": "Creation Pipeline",
+        "source_pages": [],
+        "children": [
+          {
+            "kind": "leaf",
+            "label": "Data Preparation",
+            "explanation": "Training data is filtered, deduplicated, quality-checked, and screened for privacy and safety risks.",
+            "source_pages": [
+              3
+            ],
+            "children": [],
+            "id": "root.3.1"
+          },
+          {
+            "kind": "leaf",
+            "label": "Pretraining",
+            "explanation": "During pretraining, the model repeatedly learns to predict tokens from large collections of examples.",
+            "source_pages": [
+              3
+            ],
+            "children": [],
+            "id": "root.3.2"
+          },
+          {
+            "kind": "leaf",
+            "label": "Instruction Tuning",
+            "explanation": "Instruction tuning trains the model on prompts paired with useful responses so it follows instructions.",
+            "source_pages": [
+              3
+            ],
+            "children": [],
+            "id": "root.3.3"
+          },
+          {
+            "kind": "leaf",
+            "label": "Preference Training",
+            "explanation": "Preference training uses human feedback, such as RLHF, to improve usefulness, reliability, and alignment.",
+            "source_pages": [
+              3
+            ],
+            "children": [],
+            "id": "root.3.4"
+          },
+          {
+            "kind": "leaf",
+            "label": "Evaluation and Deployment",
+            "explanation": "Models are tested for quality, robustness, bias, safety, and task performance before they are deployed.",
+            "source_pages": [
+              3
+            ],
+            "children": [],
+            "id": "root.3.5"
+          }
+        ],
+        "id": "root.3"
+      },
+      {
+        "kind": "branch",
+        "label": "Common Uses",
+        "source_pages": [],
+        "children": [
+          {
+            "kind": "leaf",
+            "label": "Writing",
+            "explanation": "LLMs brainstorm, outline, rewrite, and adjust the tone of written material.",
+            "source_pages": [
+              3,
+              4
+            ],
+            "children": [],
+            "id": "root.4.1"
+          },
+          {
+            "kind": "leaf",
+            "label": "Learning",
+            "explanation": "LLMs explain concepts at different levels and create practice questions for learners.",
+            "source_pages": [
+              3,
+              4
+            ],
+            "children": [],
+            "id": "root.4.2"
+          },
+          {
+            "kind": "leaf",
+            "label": "Documents",
+            "explanation": "LLMs summarize, compare, extract key points from, and organize information in documents.",
+            "source_pages": [
+              3,
+              4
+            ],
+            "children": [],
+            "id": "root.4.3"
+          },
+          {
+            "kind": "leaf",
+            "label": "Language",
+            "explanation": "LLMs translate text, explain idioms, and revise grammar.",
+            "source_pages": [
+              3,
+              4
+            ],
+            "children": [],
+            "id": "root.4.4"
+          },
+          {
+            "kind": "leaf",
+            "label": "Programming",
+            "explanation": "LLMs explain code, suggest fixes, and help interpret programming errors.",
+            "source_pages": [
+              3,
+              4
+            ],
+            "children": [],
+            "id": "root.4.5"
+          },
+          {
+            "kind": "leaf",
+            "label": "Planning",
+            "explanation": "LLMs break problems into steps and compare possible options.",
+            "source_pages": [
+              3,
+              4
+            ],
+            "children": [],
+            "id": "root.4.6"
+          }
+        ],
+        "id": "root.4"
+      },
+      {
+        "kind": "branch",
+        "label": "Capabilities and Limitations",
+        "source_pages": [],
+        "children": [
+          {
+            "kind": "branch",
+            "label": "Important Limitations",
+            "source_pages": [],
             "children": [
               {
-                "id": "root.1.1.1",
-                "label": "Energy conversion",
-                "summary": "Solar energy becomes chemical energy stored in carbohydrates.",
-                "source_pages": [1],
-                "children": []
+                "kind": "leaf",
+                "label": "Hallucinations",
+                "explanation": "Fluent statements can be false, unsupported, or fabricated, so important claims need verification.",
+                "source_pages": [
+                  4
+                ],
+                "children": [],
+                "id": "root.5.1.1"
               },
               {
-                "id": "root.1.1.2",
-                "label": "Carbon fixation",
-                "summary": "Carbon dioxide from the air is incorporated into organic molecules.",
-                "source_pages": [1],
-                "children": []
-              }
-            ]
-          },
-          {
-            "id": "root.1.2",
-            "label": "Why it matters",
-            "summary": "Photosynthesis supplies oxygen and forms the base of most food chains on Earth.",
-            "source_pages": [2],
-            "children": [
-              {
-                "id": "root.1.2.1",
-                "label": "Oxygen production",
-                "summary": "Water splitting releases the oxygen that aerobic life depends on.",
-                "source_pages": [2],
-                "children": []
+                "kind": "leaf",
+                "label": "Knowledge Gaps",
+                "explanation": "Training data may miss recent events or private information unless a tool provides live access.",
+                "source_pages": [
+                  4
+                ],
+                "children": [],
+                "id": "root.5.1.2"
               },
               {
-                "id": "root.1.2.2",
-                "label": "Food chains",
-                "summary": "Organic carbon produced by photosynthesis feeds consumers.",
-                "source_pages": [2],
-                "children": []
+                "kind": "leaf",
+                "label": "Bias",
+                "explanation": "Data and design choices can produce stereotypes or uneven performance across groups.",
+                "source_pages": [
+                  4
+                ],
+                "children": [],
+                "id": "root.5.1.3"
+              },
+              {
+                "kind": "leaf",
+                "label": "Precision Limits",
+                "explanation": "Arithmetic, citations, complex logic, and detailed instructions may still require checking.",
+                "source_pages": [
+                  4
+                ],
+                "children": [],
+                "id": "root.5.1.4"
+              },
+              {
+                "kind": "leaf",
+                "label": "Context Limits",
+                "explanation": "A model may miss details when an input is longer than its context window.",
+                "source_pages": [
+                  4
+                ],
+                "children": [],
+                "id": "root.5.1.5"
+              },
+              {
+                "kind": "leaf",
+                "label": "Privacy Risks",
+                "explanation": "Sensitive information should not be entered unless the service and situation are appropriate.",
+                "source_pages": [
+                  4
+                ],
+                "children": [],
+                "id": "root.5.1.6"
               }
-            ]
+            ],
+            "id": "root.5.1"
           }
-        ]
+        ],
+        "id": "root.5"
       },
       {
-        "id": "root.2",
-        "label": "Light Reactions",
-        "summary": "Light-dependent reactions take place in the thylakoid membrane and generate ATP, NADPH and oxygen.",
-        "source_pages": [2, 3],
+        "kind": "branch",
+        "label": "Prompting and Advanced Techniques",
+        "source_pages": [],
         "children": [
           {
-            "id": "root.2.1",
-            "label": "Thylakoid membrane",
-            "summary": "Pigments and protein complexes in the thylakoid membrane capture photons.",
-            "source_pages": [2],
+            "kind": "branch",
+            "label": "Practical Prompt Formula",
+            "source_pages": [],
             "children": [
               {
-                "id": "root.2.1.1",
-                "label": "Electron transport",
-                "summary": "Excited electrons move through a chain of carriers that pumps protons.",
-                "source_pages": [3],
-                "children": []
+                "kind": "leaf",
+                "label": "Task",
+                "explanation": "State clearly what you want the model to do.",
+                "source_pages": [
+                  4
+                ],
+                "children": [],
+                "id": "root.6.1.1"
+              },
+              {
+                "kind": "leaf",
+                "label": "Context",
+                "explanation": "Provide the relevant background or source material for the task.",
+                "source_pages": [
+                  4
+                ],
+                "children": [],
+                "id": "root.6.1.2"
+              },
+              {
+                "kind": "leaf",
+                "label": "Constraints",
+                "explanation": "Specify the audience, length, tone, or rules the response must follow.",
+                "source_pages": [
+                  4
+                ],
+                "children": [],
+                "id": "root.6.1.3"
+              },
+              {
+                "kind": "leaf",
+                "label": "Output Format",
+                "explanation": "Request the structure you need, such as a table, list, lesson plan, or summary.",
+                "source_pages": [
+                  4
+                ],
+                "children": [],
+                "id": "root.6.1.4"
+              },
+              {
+                "kind": "leaf",
+                "label": "Quality Check",
+                "explanation": "Ask the model to state assumptions, flag uncertainty, or separate evidence from inference.",
+                "source_pages": [
+                  4
+                ],
+                "children": [],
+                "id": "root.6.1.5"
               }
-            ]
+            ],
+            "id": "root.6.1"
           },
           {
-            "id": "root.2.2",
-            "label": "Water splitting",
-            "summary": "Water molecules are split to replace electrons lost by chlorophyll.",
-            "source_pages": [3],
+            "kind": "branch",
+            "label": "Advanced Methods",
+            "source_pages": [],
             "children": [
               {
-                "id": "root.2.2.1",
-                "label": "Oxygen release",
-                "summary": "Oxygen is released as a by-product of water splitting.",
-                "source_pages": [3],
-                "children": []
+                "kind": "leaf",
+                "label": "RAG",
+                "explanation": "Retrieval-augmented generation supplies retrieved document passages as context at response time.",
+                "source_pages": [
+                  4,
+                  5
+                ],
+                "children": [],
+                "id": "root.6.2.1"
+              },
+              {
+                "kind": "leaf",
+                "label": "Tool Use",
+                "explanation": "A system can call calculators, web search, databases, or code interpreters to perform defined operations.",
+                "source_pages": [
+                  4,
+                  5
+                ],
+                "children": [],
+                "id": "root.6.2.2"
               }
-            ]
-          },
-          {
-            "id": "root.2.3",
-            "label": "ATP and NADPH",
-            "summary": "The light reactions provide the energy carriers used by the Calvin cycle.",
-            "source_pages": [3],
-            "children": []
+            ],
+            "id": "root.6.2"
           }
-        ]
+        ],
+        "id": "root.6"
       },
       {
-        "id": "root.3",
-        "label": "Calvin Cycle",
-        "summary": "The light-independent Calvin cycle fixes carbon dioxide into sugar using ATP and NADPH.",
-        "source_pages": [4, 5],
+        "kind": "branch",
+        "label": "Responsible Use Practices",
+        "source_pages": [],
         "children": [
           {
-            "id": "root.3.1",
-            "label": "Carbon fixation",
-            "summary": "RuBisCO attaches carbon dioxide to a five-carbon sugar.",
-            "source_pages": [4],
-            "children": [
-              {
-                "id": "root.3.1.1",
-                "label": "RuBisCO",
-                "summary": "RuBisCO is the enzyme that catalyses the first step of carbon fixation.",
-                "source_pages": [4],
-                "children": []
-              }
-            ]
+            "kind": "leaf",
+            "label": "Verify Claims",
+            "explanation": "Check dates, statistics, quotations, citations, and other consequential claims against reliable sources.",
+            "source_pages": [
+              5
+            ],
+            "children": [],
+            "id": "root.7.1"
           },
           {
-            "id": "root.3.2",
-            "label": "Sugar production",
-            "summary": "Reduction and regeneration steps produce glucose and rebuild the starting material.",
-            "source_pages": [5],
-            "children": [
-              {
-                "id": "root.3.2.1",
-                "label": "Glucose",
-                "summary": "Fixed carbon is assembled into glucose and other carbohydrates.",
-                "source_pages": [5],
-                "children": []
-              }
-            ]
+            "kind": "leaf",
+            "label": "Protect Privacy",
+            "explanation": "Avoid sharing passwords, private records, or confidential information without suitable safeguards.",
+            "source_pages": [
+              5
+            ],
+            "children": [],
+            "id": "root.7.2"
+          },
+          {
+            "kind": "leaf",
+            "label": "Respect Intellectual Property",
+            "explanation": "Follow the intellectual-property rules that apply to your school or workplace.",
+            "source_pages": [
+              5
+            ],
+            "children": [],
+            "id": "root.7.3"
+          },
+          {
+            "kind": "leaf",
+            "label": "Disclose AI Use",
+            "explanation": "Follow assignment and workplace policies about disclosing AI assistance.",
+            "source_pages": [
+              5
+            ],
+            "children": [],
+            "id": "root.7.4"
+          },
+          {
+            "kind": "leaf",
+            "label": "Watch for Bias",
+            "explanation": "Consider whose perspectives may be missing and whether recommendations are fair.",
+            "source_pages": [
+              5
+            ],
+            "children": [],
+            "id": "root.7.5"
+          },
+          {
+            "kind": "leaf",
+            "label": "Keep Human Responsibility",
+            "explanation": "Use qualified human review for high-stakes health, legal, financial, employment, or safety decisions.",
+            "source_pages": [
+              5
+            ],
+            "children": [],
+            "id": "root.7.6"
           }
-        ]
-      },
-      {
-        "id": "root.4",
-        "label": "Chloroplast Anatomy",
-        "summary": "The chloroplast contains the membranes and compartments where photosynthesis takes place.",
-        "source_pages": [5, 6],
-        "children": [
-          {
-            "id": "root.4.1",
-            "label": "Stroma",
-            "summary": "The stroma is the fluid-filled space where the Calvin cycle runs.",
-            "source_pages": [5],
-            "children": []
-          },
-          {
-            "id": "root.4.2",
-            "label": "Thylakoid stacks",
-            "summary": "Stacked thylakoids increase the membrane area available for light capture.",
-            "source_pages": [6],
-            "children": [
-              {
-                "id": "root.4.2.1",
-                "label": "Grana",
-                "summary": "Grana are the stacks of thylakoid discs inside the chloroplast.",
-                "source_pages": [6],
-                "children": []
-              }
-            ]
-          },
-          {
-            "id": "root.4.3",
-            "label": "Chlorophyll",
-            "summary": "Chlorophyll absorbs mainly blue and red wavelengths of light.",
-            "source_pages": [6],
-            "children": []
-          }
-        ]
-      },
-      {
-        "id": "root.5",
-        "label": "Applications",
-        "summary": "Insights from photosynthesis research inform agriculture and renewable energy technologies.",
-        "source_pages": [7, 8],
-        "children": [
-          {
-            "id": "root.5.1",
-            "label": "Agriculture",
-            "summary": "Understanding photosynthesis helps improve crop productivity.",
-            "source_pages": [7],
-            "children": [
-              {
-                "id": "root.5.1.1",
-                "label": "Crop yields",
-                "summary": "Optimising light use and carbon fixation can raise crop yields.",
-                "source_pages": [7],
-                "children": []
-              }
-            ]
-          },
-          {
-            "id": "root.5.2",
-            "label": "Renewable energy",
-            "summary": "Artificial systems aim to mimic photosynthesis for fuel production.",
-            "source_pages": [8],
-            "children": [
-              {
-                "id": "root.5.2.1",
-                "label": "Artificial photosynthesis",
-                "summary": "Researchers design devices that use light to make chemical fuels.",
-                "source_pages": [8],
-                "children": []
-              }
-            ]
-          }
-        ]
+        ],
+        "id": "root.7"
       }
-    ]
+    ],
+    "id": "root"
   },
   "meta": {
-    "model": "mock-heuristic-v1",
-    "generated_at": "2025-01-15T10:30:00Z",
-    "node_count": 29,
+    "schema_version": 2,
+    "model": "sample-curated",
+    "generated_at": "2025-10-19T08:00:00Z",
+    "node_count": 50,
+    "leaf_count": 39,
+    "branch_count": 10,
     "depth": 3,
     "cache_hit": false,
     "repair_attempts": 0,
-    "generation_path": "single_call",
+    "generation_path": "concept_clustering",
     "output_language": "en",
-    "processing_ms": 1240,
-    "fixes": []
+    "processing_ms": 0,
+    "fixes": [],
+    "warnings": []
   }
 }

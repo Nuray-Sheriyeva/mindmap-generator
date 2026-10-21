@@ -36,7 +36,7 @@ class Job:
     status: JobStatus = JobStatus.pending
     stage: str | None = "queued"
     stage_index: int = 0
-    total_stages: int = 6
+    total_stages: int = 7
     progress: float = 0.0
     error: dict[str, Any] | None = None
     result: dict[str, Any] | None = None

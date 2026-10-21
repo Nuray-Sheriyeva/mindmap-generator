@@ -7,6 +7,7 @@ import re
 
 from pydantic import BaseModel, Field
 
+from .models import SectionKind
 from .pdf.types import DocumentSection
 
 _SENTENCE_BREAK = re.compile(r"(?<=[.!?])\s+")
@@ -19,6 +20,7 @@ class DocumentChunk(BaseModel):
     index: int
     section_title: str
     section_level: int
+    section_kind: SectionKind = "content"
     text: str
     source_pages: list[int] = Field(default_factory=list)
     token_estimate: int
@@ -109,6 +111,7 @@ def chunk_document(
                     index=index,
                     section_title=_section.title,
                     section_level=_section.level,
+                    section_kind=_section.kind,
                     text=text,
                     source_pages=sorted(set(current_pages)) or [_section.page_start],
                     token_estimate=estimate_tokens(text),

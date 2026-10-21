@@ -54,6 +54,15 @@ describe('tree helpers', () => {
     ]);
   });
 
+  it('keeps explanations on leaves and categories free of explanations', () => {
+    const visible = collectVisible(root, new Set());
+    const leaves = visible.filter((entry) => entry.node.kind === 'leaf');
+    const branches = visible.filter((entry) => entry.node.kind !== 'leaf');
+    expect(leaves.length).toBe(SAMPLE_RESULT.meta.leaf_count);
+    expect(leaves.every((entry) => Boolean(entry.node.explanation))).toBe(true);
+    expect(branches.every((entry) => !entry.node.explanation)).toBe(true);
+  });
+
   it('collects collapsible ids including nested nodes', () => {
     const ids = collectIdsWithChildren(root);
     expect(ids).toContain(root.id);
@@ -81,7 +90,7 @@ describe('formatPages', () => {
 
 describe('branch colors', () => {
   it('cycles the palette and uses a neutral root color', () => {
-    expect(colorForBranch(-1)).toBe('#334155');
+    expect(colorForBranch(-1)).toBe('#7c5cff');
     expect(colorForBranch(0)).toBe(BRANCH_COLORS[0]);
     expect(colorForBranch(BRANCH_COLORS.length)).toBe(BRANCH_COLORS[0]);
   });

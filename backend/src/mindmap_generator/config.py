@@ -43,17 +43,18 @@ class Settings(BaseSettings):
     default_max_depth: int = 3
     max_depth_limit: int = 3
     min_depth: int = 2
-    default_max_branches: int = 6
-    max_branches_limit: int = 12
+    default_max_branches: int = 7
+    max_branches_limit: int = 8
     max_children: int = 6
-    max_parent_branches: int = 8
     max_repair_attempts: int = 2
+    max_concepts: int = 120
+    min_leaf_words: int = 5
+    max_leaf_words: int = 32
+    min_grounding_overlap: float = 0.2
 
     # Chunking
     chunk_chars: int = 6000
     chunk_overlap_chars: int = 300
-    single_call_char_limit: int = 12000
-    max_input_chars: int = 48000
 
     # LLM
     llm_provider: Literal["openai", "mock"] = "openai"
@@ -68,7 +69,7 @@ class Settings(BaseSettings):
     llm_temperature: float = 0.2
     llm_json_mode: Literal["json_schema", "json_object"] = "json_schema"
     llm_concurrency: int = 4
-    llm_max_output_tokens: int = 4096
+    llm_max_output_tokens: int = 8192
 
     # Jobs / cache
     job_ttl_minutes: int = 60

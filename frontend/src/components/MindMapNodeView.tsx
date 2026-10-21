@@ -5,26 +5,24 @@ import type { MindMapFlowNode } from '../lib/layout';
 import { formatPages } from '../lib/tree';
 import { MindMapActionsContext } from './mindmap-context';
 
-function MindMapNodeView({ data, selected }: NodeProps<MindMapFlowNode>) {
-  const { node, depth, color, collapsed, hasChildren, childCount, direction } = data;
+function MindMapNodeView({ data }: NodeProps<MindMapFlowNode>) {
+  const { node, kind, depth, color, collapsed, hasChildren, childCount, direction } = data;
   const actions = useContext(MindMapActionsContext);
   const pages = formatPages(node.source_pages);
   const isRoot = depth === 0;
-
   const style = { '--node-color': color } as CSSProperties;
 
   return (
     <div
       className={[
         'mind-node',
+        `mind-node--${kind}`,
         isRoot ? 'mind-node--root' : '',
-        selected ? 'is-selected' : '',
         collapsed ? 'is-collapsed' : '',
       ]
         .filter(Boolean)
         .join(' ')}
       style={style}
-      title={node.summary || node.label}
     >
       {direction === 'LR' ? (
         <>
@@ -38,37 +36,35 @@ function MindMapNodeView({ data, selected }: NodeProps<MindMapFlowNode>) {
         </>
       )}
 
-      <div className="mind-node__body">
-        <div className="mind-node__top">
-          <span className="mind-node__label">{node.label}</span>
-          {hasChildren && (
+      {kind === 'leaf' ? (
+        <div className="mind-leaf">
+          <div className="mind-leaf__label">{node.label}</div>
+          <p className="mind-leaf__explanation">{node.explanation}</p>
+          {pages ? <span className="mind-leaf__pages">p. {pages}</span> : null}
+        </div>
+      ) : (
+        <div className="mind-branch">
+          <span className="mind-branch__dot" aria-hidden="true" />
+          <span className="mind-branch__label">{node.label}</span>
+          {hasChildren ? (
             <button
               type="button"
-              className="mind-node__toggle"
+              className="mind-branch__toggle nodrag nopan"
               aria-label={
-                collapsed ? `Expand ${node.label}` : `Collapse ${node.label}`
+                collapsed
+                  ? `Expand ${node.label} (${childCount} branches)`
+                  : `Collapse ${node.label}`
               }
-              title={collapsed ? 'Expand branch' : 'Collapse branch'}
               onClick={(event) => {
                 event.stopPropagation();
                 actions?.toggleNode(node.id);
               }}
             >
-              {collapsed ? `+${childCount}` : '−'}
+              <span aria-hidden="true">{collapsed ? '▸' : '▾'}</span>
             </button>
-          )}
+          ) : null}
         </div>
-        <div className="mind-node__meta">
-          {pages ? <span className="mind-node__pages">p. {pages}</span> : null}
-          {hasChildren ? (
-            <span className="mind-node__count">
-              {childCount} {childCount === 1 ? 'branch' : 'branches'}
-            </span>
-          ) : (
-            <span className="mind-node__leaf">detail</span>
-          )}
-        </div>
-      </div>
+      )}
     </div>
   );
 }

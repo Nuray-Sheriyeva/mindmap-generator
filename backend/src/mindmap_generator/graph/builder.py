@@ -1,4 +1,4 @@
-"""Compile the LangGraph pipeline once per application."""
+"""Compile the concept-first LangGraph pipeline once per application."""
 
 from __future__ import annotations
 
@@ -17,15 +17,14 @@ def build_graph(
     llm: LLMClient,
     job_store: ProgressSink | None = None,
 ) -> Any:
-    """Build and compile the mind map StateGraph.
+    """Build and compile the concept-first mind map StateGraph.
 
     Graph shape::
 
-        START → parse_pdf → chunk_document
-                 ├─ long document → summarize_chunks → build_hierarchy
-                 └─ short document → build_hierarchy
-              → validate_and_repair ─┬─ valid → finalize → END
-                                     └─ invalid → request_repair → validate_and_repair
+        START → parse_pdf → classify_sections → chunk_document
+              → extract_concepts → build_hierarchy → validate_and_repair
+              ├─ valid → finalize → END
+              └─ invalid → request_repair (concepts or clusters) → validate
     """
     deps = GraphDependencies(settings=settings, llm=llm, job_store=job_store)
     nodes = build_nodes(deps)
@@ -35,23 +34,10 @@ def build_graph(
         graph.add_node(name, node)
 
     graph.add_edge(START, "parse_pdf")
-    graph.add_edge("parse_pdf", "chunk_document")
-
-    def route_after_chunking(state: PipelineState) -> str:
-        total_chars = sum(len(chunk.get("text", "")) for chunk in state.get("chunks", []))
-        if total_chars <= settings.single_call_char_limit:
-            return "build_hierarchy"
-        return "summarize_chunks"
-
-    graph.add_conditional_edges(
-        "chunk_document",
-        route_after_chunking,
-        {
-            "build_hierarchy": "build_hierarchy",
-            "summarize_chunks": "summarize_chunks",
-        },
-    )
-    graph.add_edge("summarize_chunks", "build_hierarchy")
+    graph.add_edge("parse_pdf", "classify_sections")
+    graph.add_edge("classify_sections", "chunk_document")
+    graph.add_edge("chunk_document", "extract_concepts")
+    graph.add_edge("extract_concepts", "build_hierarchy")
     graph.add_edge("build_hierarchy", "validate_and_repair")
 
     def route_after_validation(state: PipelineState) -> str:

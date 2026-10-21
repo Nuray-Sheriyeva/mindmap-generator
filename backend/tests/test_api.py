@@ -5,11 +5,17 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from conftest import FakeLLMClient, build_blank_pdf
+from conftest import (
+    FakeLLMClient,
+    build_blank_pdf,
+    make_russian_cluster,
+    make_russian_concepts,
+)
 from fastapi.testclient import TestClient
 
 from mindmap_generator.api.main import create_app
 from mindmap_generator.config import Settings
+from mindmap_generator.llm.openai_compat import OpenAICompatibleClient
 
 BASE_SETTINGS: dict[str, Any] = {
     "llm_provider": "mock",
@@ -39,7 +45,8 @@ def test_health_and_docs() -> None:
         body = response.json()
         assert body["status"] == "ok"
         assert body["llm_provider"] == "fake"
-        assert body["llm_model"] == "fake-model-v1"
+        assert body["llm_model"] == "fake-model-v2"
+        assert body["llm_configured"] is True
         assert client.get("/docs").status_code == 200
         openapi = client.get("/openapi.json").json()
         assert "/mindmaps" in openapi["paths"]
@@ -63,10 +70,19 @@ def test_upload_status_and_exports(sample_pdf_bytes: bytes) -> None:
         assert job["error"] is None
         result = job["result"]
         assert result["mindmap"]["id"] == "root"
+        assert result["mindmap"]["kind"] == "root"
         assert result["mindmap"]["label"] == "Photosynthesis"
         assert result["document"]["pages"] == 3
-        assert result["meta"]["node_count"] >= 5
-        assert len(fake.calls) == 1
+        assert result["meta"]["schema_version"] == 2
+        assert result["meta"]["leaf_count"] == 10
+        assert result["meta"]["node_count"] >= 15
+        assert all(
+            node["kind"] != "leaf" or node["explanation"]
+            for branch in result["mindmap"]["children"]
+            for node in branch["children"]
+        )
+        assert any(call["schema_name"] == "concept_extraction" for call in fake.calls)
+        assert any(call["schema_name"] == "cluster" for call in fake.calls)
 
         json_export = client.get(f"/mindmaps/{created['job_id']}/export?format=json")
         assert json_export.status_code == 200
@@ -78,26 +94,38 @@ def test_upload_status_and_exports(sample_pdf_bytes: bytes) -> None:
         assert markdown.status_code == 200
         assert markdown.headers["content-type"].startswith("text/markdown")
         assert "# Photosynthesis" in markdown.text
+        assert "## Core Concepts" in markdown.text
+        assert "Photosynthesis converts light energy into chemical energy." in markdown.text
         assert "_Source pages:" in markdown.text
-        assert "## " in markdown.text
 
 
 def test_generation_options_are_applied(sample_pdf_bytes: bytes) -> None:
-    fake = FakeLLMClient()
+    ids = [f"c{index}" for index in range(1, 11)]
+    fake = FakeLLMClient(
+        concept_responses=[make_russian_concepts() for _ in range(8)],
+        cluster_responses=[make_russian_cluster(ids)],
+    )
     with make_client(fake) as client:
         response = upload(
             client,
             sample_pdf_bytes,
-            form={"max_depth": "2", "max_branches": "3", "language": "ru"},
+            form={"max_depth": "2", "max_branches": "5", "language": "ru"},
         )
         assert response.status_code == 202
         job = client.get(f"/mindmaps/{response.json()['job_id']}").json()
         assert job["status"] == "completed"
         result = job["result"]
         assert result["meta"]["depth"] <= 2
-        assert len(result["mindmap"]["children"]) <= 3
+        assert len(result["mindmap"]["children"]) <= 5
         assert result["meta"]["output_language"] == "ru"
         assert "OUTPUT LANGUAGE: Russian" in fake.calls[0]["user"]
+        assert "SOURCE LANGUAGE: English" in fake.calls[0]["user"]
+        assert all(
+            any("\u0400" <= char <= "\u04ff" for char in child["label"])
+            for branch in result["mindmap"]["children"]
+            for child in branch["children"]
+            if child["kind"] == "leaf"
+        )
 
 
 def test_result_cache_by_file_hash(sample_pdf_bytes: bytes) -> None:
@@ -107,7 +135,8 @@ def test_result_cache_by_file_hash(sample_pdf_bytes: bytes) -> None:
         assert first.status_code == 202
         first_job = client.get(f"/mindmaps/{first.json()['job_id']}").json()
         assert first_job["cache_hit"] is False
-        assert len(fake.calls) == 1
+        calls_after_first = len(fake.calls)
+        assert calls_after_first >= 2
 
         second = upload(client, sample_pdf_bytes)
         assert second.status_code == 202
@@ -115,7 +144,7 @@ def test_result_cache_by_file_hash(sample_pdf_bytes: bytes) -> None:
         assert second_job["status"] == "completed"
         assert second_job["cache_hit"] is True
         assert second_job["result"]["meta"]["cache_hit"] is True
-        assert len(fake.calls) == 1  # no additional LLM calls
+        assert len(fake.calls) == calls_after_first  # no additional LLM calls
 
 
 def test_rejects_oversized_upload(sample_pdf_bytes: bytes) -> None:
@@ -225,3 +254,20 @@ def test_cors_allows_configured_origin() -> None:
         )
         assert response.status_code == 200
         assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
+
+
+def test_missing_api_key_is_explained_in_job_error(sample_pdf_bytes: bytes) -> None:
+    settings = Settings(**{**BASE_SETTINGS, "llm_provider": "openai"})
+    llm = OpenAICompatibleClient(Settings(llm_provider="openai", llm_api_key=None))
+    app = create_app(settings, llm=llm)
+    with TestClient(app) as client:
+        health = client.get("/health").json()
+        assert health["llm_configured"] is False
+
+        response = upload(client, sample_pdf_bytes)
+        assert response.status_code == 202
+        job = client.get(f"/mindmaps/{response.json()['job_id']}")
+        assert job.status_code == 502
+        payload = job.json()
+        assert payload["status"] == "failed"
+        assert "No LLM API key configured" in payload["error"]["message"]

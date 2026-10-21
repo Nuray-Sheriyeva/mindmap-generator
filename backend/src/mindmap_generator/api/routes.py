@@ -77,6 +77,7 @@ async def health(settings: SettingsDep, llm: LLMDep) -> HealthResponse:
         environment=settings.environment,
         llm_provider=llm.provider,
         llm_model=llm.model,
+        llm_configured=llm.configuration_error() is None,
         cache_enabled=settings.cache_enabled,
     )
 
@@ -99,7 +100,7 @@ async def create_mindmap(
     store: JobStoreDep,
     runner: RunnerDep,
     max_depth: Annotated[int | None, Form(description="Levels below the root (2-3)")] = None,
-    max_branches: Annotated[int | None, Form(description="Main branches (2-12)")] = None,
+    max_branches: Annotated[int | None, Form(description="Main branches (2-8)")] = None,
     language: Annotated[
         str | None,
         Form(description="Output language ISO code; omit to mirror the document"),
@@ -126,7 +127,6 @@ async def create_mindmap(
     options = GenerationOptions(
         max_depth=settings.clamp_max_depth(max_depth),
         max_branches=settings.clamp_max_branches(max_branches),
-        max_children=settings.max_children,
         language=requested_language,
     )
     file_hash = hashlib.sha256(data).hexdigest()

@@ -31,14 +31,14 @@ def export_json(result: dict[str, Any]) -> str:
 def _render_node(node: dict[str, Any], level: int, lines: list[str]) -> None:
     heading = "#" * min(level, 6)
     lines.append(f"{heading} {node.get('label', 'Untitled')}")
-    summary = (node.get("summary") or "").strip()
-    if summary:
+    explanation = (node.get("explanation") or "").strip()
+    if node.get("kind") == "leaf" and explanation:
         lines.append("")
-        lines.append(summary)
-    pages = format_pages(node.get("source_pages") or [])
-    if pages:
-        lines.append("")
-        lines.append(f"_Source pages: {pages}_")
+        lines.append(explanation)
+        pages = format_pages(node.get("source_pages") or [])
+        if pages:
+            lines.append("")
+            lines.append(f"_Source pages: {pages}_")
     lines.append("")
     for child in node.get("children") or []:
         _render_node(child, level + 1, lines)

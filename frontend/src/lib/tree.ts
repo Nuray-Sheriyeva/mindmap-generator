@@ -3,17 +3,17 @@
 import type { MindMapNode } from '../types/mindmap';
 
 export const BRANCH_COLORS = [
-  '#2563eb',
-  '#0d9488',
+  '#7c5cff',
+  '#4f7cff',
+  '#0f9f8f',
   '#d97706',
-  '#c026d3',
   '#e11d48',
-  '#7c3aed',
   '#0891b2',
+  '#8b5cf6',
   '#65a30d',
 ] as const;
 
-export const ROOT_COLOR = '#334155';
+export const ROOT_COLOR = '#7c5cff';
 
 export interface VisibleNode {
   node: MindMapNode;

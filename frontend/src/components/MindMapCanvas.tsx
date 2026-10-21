@@ -6,6 +6,8 @@ import {
   Panel,
   ReactFlow,
   ReactFlowProvider,
+  getNodesBounds,
+  getViewportForBounds,
   useEdgesState,
   useNodesState,
   useReactFlow,
@@ -13,7 +15,7 @@ import {
   type Node,
   type NodeTypes,
 } from '@xyflow/react';
-import { useEffect, useMemo, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, type MutableRefObject } from 'react';
 
 import {
   buildLayout,
@@ -27,15 +29,17 @@ import { MindMapNodeComponent } from './MindMapNodeView';
 
 const NODE_TYPES = { mind: MindMapNodeComponent } as unknown as NodeTypes;
 
+export interface FlowExportApi {
+  exportImage: (format: 'png' | 'svg') => Promise<void>;
+}
+
 interface MindMapCanvasProps {
   result: MindMapResult;
   collapsed: ReadonlySet<string>;
   direction: LayoutDirection;
-  selectedId: string | null;
   fitSignal: number;
-  flowRef: RefObject<HTMLDivElement>;
+  exportRef: MutableRefObject<FlowExportApi | null>;
   onToggle: (id: string) => void;
-  onSelect: (id: string | null) => void;
   onExpandAll: () => void;
   onCollapseAll: () => void;
 }
@@ -44,11 +48,9 @@ function Canvas({
   result,
   collapsed,
   direction,
-  selectedId,
   fitSignal,
-  flowRef,
+  exportRef,
   onToggle,
-  onSelect,
   onExpandAll,
   onCollapseAll,
 }: MindMapCanvasProps) {
@@ -58,7 +60,8 @@ function Canvas({
   );
   const [nodes, setNodes, onNodesChange] = useNodesState<MindMapFlowNode>(layout.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(layout.edges);
-  const { fitView } = useReactFlow();
+  const { fitView, setViewport } = useReactFlow();
+  const flowRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setNodes(layout.nodes);
@@ -66,21 +69,88 @@ function Canvas({
   }, [layout, setEdges, setNodes]);
 
   useEffect(() => {
-    setNodes((current) =>
-      current.map((node) =>
-        node.selected === (node.id === selectedId)
-          ? node
-          : { ...node, selected: node.id === selectedId },
-      ),
-    );
-  }, [selectedId, setNodes]);
+    const timer = window.setTimeout(() => {
+      const wrapper = flowRef.current;
+      const root = layout.nodes.find((node) => node.id === result.mindmap.id);
+      if (!wrapper || !root) return;
+      const rect = wrapper.getBoundingClientRect();
+      const rootWidth = Number((root.style as { width?: number })?.width ?? 260);
+      const rootHeight = Number((root.style as { height?: number })?.height ?? 74);
+      const zoom = direction === 'LR' ? 0.82 : 0.78;
+      const anchorX =
+        direction === 'LR'
+          ? Math.max(rect.width * 0.24, (rootWidth * zoom) / 2 + 16)
+          : rect.width / 2;
+      const anchorY =
+        direction === 'LR'
+          ? rect.height / 2
+          : Math.max(rect.height * 0.22, (rootHeight * zoom) / 2 + 16);
+      void setViewport(
+        {
+          x: anchorX - (root.position.x + rootWidth / 2) * zoom,
+          y: anchorY - (root.position.y + rootHeight / 2) * zoom,
+          zoom,
+        },
+        { duration: 300 },
+      );
+    }, 120);
+    return () => window.clearTimeout(timer);
+  }, [direction, layout.nodes, result.mindmap.id, setViewport]);
 
   useEffect(() => {
+    if (fitSignal <= 0) return;
     const timer = window.setTimeout(() => {
-      void fitView({ padding: 0.22, duration: 350 });
-    }, 90);
+      void fitView({ padding: 0.12, duration: 400 });
+    }, 30);
     return () => window.clearTimeout(timer);
-  }, [fitSignal, fitView, layout]);
+  }, [fitSignal, fitView]);
+
+  useEffect(() => {
+    exportRef.current = {
+      exportImage: async (format: 'png' | 'svg') => {
+        const viewportElement = flowRef.current?.querySelector<HTMLElement>(
+          '.react-flow__viewport',
+        );
+        if (!viewportElement || nodes.length === 0) {
+          throw new Error('The canvas is not ready yet.');
+        }
+        const { toPng, toSvg } = await import('html-to-image');
+        const bounds = getNodesBounds(nodes);
+        const maxDimension = 5600;
+        const scale = Math.min(
+          maxDimension / Math.max(bounds.width, 1),
+          maxDimension / Math.max(bounds.height, 1),
+          1.35,
+        );
+        const width = Math.max(1800, Math.round(bounds.width * scale));
+        const height = Math.max(1100, Math.round(bounds.height * scale));
+        const viewport = getViewportForBounds(bounds, width, height, 0.1, 2, 0.06);
+        const options = {
+          backgroundColor: '#f7f7fb',
+          width,
+          height,
+          pixelRatio: 1.5,
+          cacheBust: true,
+          style: {
+            width: `${width}px`,
+            height: `${height}px`,
+            transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
+          },
+        };
+        const dataUrl =
+          format === 'png'
+            ? await toPng(viewportElement, options)
+            : await toSvg(viewportElement, options);
+        const anchor = document.createElement('a');
+        anchor.href = dataUrl;
+        anchor.download = `${result.document.filename.replace(/\.pdf$/i, '') || 'document'}-mindmap.${format}`;
+        anchor.click();
+      },
+    };
+    return () => {
+      exportRef.current = null;
+    };
+  }, [exportRef, nodes, result.document.filename]);
 
   return (
     <div className="flow-wrap" ref={flowRef}>
@@ -91,38 +161,38 @@ function Canvas({
           nodeTypes={NODE_TYPES}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
-          onNodeClick={(_, node) => onSelect(node.id)}
-          onPaneClick={() => onSelect(null)}
-          minZoom={0.12}
+          minZoom={0.08}
           maxZoom={2.4}
           nodesConnectable={false}
+          nodesFocusable={false}
           edgesFocusable={false}
+          elementsSelectable={false}
           proOptions={{ hideAttribution: false }}
           aria-label="Mind map canvas"
         >
           <Background
-            variant={BackgroundVariant.Dots}
-            gap={22}
-            size={1.4}
-            color="#c9d5e5"
+            variant={BackgroundVariant.Lines}
+            gap={28}
+            size={1}
+            color="#dedee9"
           />
           <Controls showInteractive={false} position="bottom-right" />
           <MiniMap
             pannable
             zoomable
             position="top-right"
-            maskColor="rgba(148, 163, 184, 0.12)"
+            maskColor="rgba(10, 10, 18, 0.08)"
             nodeStrokeWidth={2}
             nodeColor={(node: Node) => {
               const data = node.data as unknown as MindMapNodeData;
-              return data.color ?? '#94a3b8';
+              return data.color ?? '#7c5cff';
             }}
           />
           <Panel position="bottom-left" className="flow-panel">
             <button
               type="button"
               className="flow-panel__button"
-              onClick={() => void fitView({ padding: 0.22, duration: 400 })}
+              onClick={() => void fitView({ padding: 0.12, duration: 400 })}
             >
               Fit view
             </button>

@@ -27,10 +27,12 @@ from .routes import router
 logger = logging.getLogger(__name__)
 
 DESCRIPTION = """
-Turn any text-based PDF into an interactive, hierarchical mind map.
+Turn any text-based PDF into an interactive, concept-first mind map.
 
-* Upload a PDF → background LangGraph pipeline (parse → chunk → summarize →
-  hierarchy → validate/repair → finalize)
+* Upload a PDF → background LangGraph pipeline (parse → classify sections →
+  chunk → extract concept cards → cluster ideas → validate/repair → finalize)
+* Category nodes stay clean; leaves carry a visible, grounded explanation and
+  source pages
 * Poll the job for stage-by-stage progress
 * Export as JSON or a Markdown outline
 
@@ -144,6 +146,9 @@ def create_app(
             store=app.state.store,
             cache=app.state.cache,
         )
+        configuration_error = app.state.llm.configuration_error()
+        if configuration_error:
+            logger.warning("LLM provider is not configured: %s", configuration_error)
         logger.info(
             "Application started provider=%s model=%s",
             app_settings.llm_provider,

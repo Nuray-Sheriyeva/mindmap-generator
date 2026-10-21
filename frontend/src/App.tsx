@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { FileUpload } from './components/FileUpload';
-import { MindMapCanvas } from './components/MindMapCanvas';
-import { NodePanel } from './components/NodePanel';
+import { MindMapCanvas, type FlowExportApi } from './components/MindMapCanvas';
 import { ProgressPanel } from './components/ProgressPanel';
 import {
   ArrowLeftIcon,
@@ -13,10 +12,10 @@ import {
   FitIcon,
 } from './components/icons';
 import { SAMPLE_RESULT } from './data/sample';
-import { ApiError, createMindMap, getMindMapJob } from './lib/api';
-import { downloadFlowImage, downloadMindMap } from './lib/exports';
+import { ApiError, createMindMap, getHealth, getMindMapJob } from './lib/api';
+import { downloadMindMap } from './lib/exports';
 import type { LayoutDirection } from './lib/layout';
-import { collectIdsWithChildren, findNode, toggleCollapsed } from './lib/tree';
+import { collectIdsWithChildren, toggleCollapsed } from './lib/tree';
 import type { GenerationOptions, JobResponse, MindMapResult } from './types/mindmap';
 
 type Screen = 'upload' | 'generating' | 'map';
@@ -39,7 +38,6 @@ export default function App() {
   const [result, setResult] = useState<MindMapResult | null>(null);
   const [filename, setFilename] = useState('');
   const [error, setError] = useState<UiError | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
   const [direction, setDirection] = useState<LayoutDirection>('LR');
   const [fitSignal, setFitSignal] = useState(0);
@@ -47,7 +45,8 @@ export default function App() {
   const [exporting, setExporting] = useState<ExportFormat | null>(null);
   const [toast, setToast] = useState<Toast | null>(null);
   const [sampleMode, setSampleMode] = useState(false);
-  const flowRef = useRef<HTMLDivElement>(null);
+  const [llmConfigured, setLlmConfigured] = useState<boolean | null>(null);
+  const flowExportRef = useRef<FlowExportApi | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -65,7 +64,6 @@ export default function App() {
         if (next.status === 'completed' && next.result) {
           setResult(next.result);
           setFilename(next.result.document.filename);
-          setSelectedId(null);
           setCollapsed(new Set());
           setScreen('map');
           setJobId(null);
@@ -109,6 +107,14 @@ export default function App() {
   }, [jobId, screen]);
 
   useEffect(() => {
+    const controller = new AbortController();
+    getHealth(controller.signal)
+      .then((health) => setLlmConfigured(health.llm_configured))
+      .catch(() => setLlmConfigured(null));
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
     if (!toast) return;
     const timer = window.setTimeout(() => setToast(null), 4500);
     return () => window.clearTimeout(timer);
@@ -132,7 +138,6 @@ export default function App() {
     setResult(null);
     setFilename('');
     setError(null);
-    setSelectedId(null);
     setCollapsed(new Set());
     setExportOpen(false);
     setExporting(null);
@@ -165,14 +170,8 @@ export default function App() {
     setError(null);
     setJob(null);
     setJobId(null);
-    setSelectedId(null);
     setCollapsed(new Set());
   }, []);
-
-  const selectedNode = useMemo(
-    () => (result ? findNode(result.mindmap, selectedId) : null),
-    [result, selectedId],
-  );
 
   const handleToggle = useCallback((id: string) => {
     setCollapsed((current) => toggleCollapsed(current, id));
@@ -199,8 +198,8 @@ export default function App() {
       }
       setExporting(format);
       try {
-        if (!flowRef.current) throw new Error('Canvas is not ready yet.');
-        await downloadFlowImage(flowRef.current, result, format);
+        if (!flowExportRef.current) throw new Error('Canvas is not ready yet.');
+        await flowExportRef.current.exportImage(format);
         setToast({ message: `${format.toUpperCase()} snapshot downloaded.`, kind: 'info' });
       } catch {
         setToast({
@@ -217,110 +216,120 @@ export default function App() {
   const showHeaderActions = screen === 'map' && result !== null;
 
   return (
-    <div className={`app ${screen === 'map' ? 'app--map' : ''}`}>
+    <div
+      className={`app ${screen === 'map' ? 'app--map' : ''} ${
+        screen === 'upload' ? 'app--upload' : ''
+      }`}
+    >
       <header className="app-header">
-        <div className="brand">
-          <span className="brand__mark" aria-hidden="true">
-            <svg viewBox="0 0 32 32" width="22" height="22">
-              <circle cx="16" cy="16" r="4" fill="currentColor" />
-              <circle cx="6" cy="6" r="2.6" fill="currentColor" opacity=".85" />
-              <circle cx="26" cy="6" r="2.6" fill="currentColor" opacity=".85" />
-              <circle cx="6" cy="26" r="2.6" fill="currentColor" opacity=".85" />
-              <circle cx="26" cy="26" r="2.6" fill="currentColor" opacity=".85" />
-              <path
-                d="M16 16 6 6m10 10L26 6M16 16 6 26m10-10 10 10"
-                stroke="currentColor"
-                strokeWidth="1.7"
-                opacity=".7"
-              />
-            </svg>
-          </span>
-          <div className="brand__text">
-            <strong>Mind Map Generator</strong>
-            <span>NotebookLM-style PDF explorer</span>
-          </div>
-        </div>
-
-        {showHeaderActions && result && (
-          <div className="doc-chip" title={filename}>
-            <span className="doc-chip__dot" />
-            <span className="doc-chip__name">{result.document.title || filename}</span>
-            <span className="doc-chip__meta">
-              {result.document.pages} pages · {result.document.language.toUpperCase()}
-              {sampleMode ? ' · sample' : ''}
+        <div className="app-header__bar">
+          <div className="brand">
+            <span className="brand__mark" aria-hidden="true">
+              <svg viewBox="0 0 32 32" width="22" height="22">
+                <circle cx="16" cy="16" r="4" fill="currentColor" />
+                <circle cx="6" cy="6" r="2.6" fill="currentColor" opacity=".85" />
+                <circle cx="26" cy="6" r="2.6" fill="currentColor" opacity=".85" />
+                <circle cx="6" cy="26" r="2.6" fill="currentColor" opacity=".85" />
+                <circle cx="26" cy="26" r="2.6" fill="currentColor" opacity=".85" />
+                <path
+                  d="M16 16 6 6m10 10L26 6M16 16 6 26m10-10 10 10"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  opacity=".7"
+                />
+              </svg>
             </span>
+            <div className="brand__text">
+              <strong>Mind Map</strong>
+              <span>PDF knowledge studio</span>
+            </div>
           </div>
-        )}
 
-        <div className="header-actions">
-          {showHeaderActions ? (
-            <>
-              <button
-                type="button"
-                className="tool-button tool-button--icon"
-                title={direction === 'LR' ? 'Switch to vertical layout' : 'Switch to horizontal layout'}
-                onClick={() => setDirection((current) => (current === 'LR' ? 'TB' : 'LR'))}
-              >
-                {direction === 'LR' ? <ExpandIcon size={16} /> : <CollapseIcon size={16} />}
-                <span>{direction === 'LR' ? 'Vertical' : 'Horizontal'}</span>
-              </button>
-              <button
-                type="button"
-                className="tool-button tool-button--icon"
-                onClick={() => setFitSignal((value) => value + 1)}
-              >
-                <FitIcon size={16} />
-                <span>Fit</span>
-              </button>
-              <div className="export-menu" ref={menuRef}>
+          {showHeaderActions && result && (
+            <div className="doc-chip" title={filename}>
+              <span className="doc-chip__dot" />
+              <span className="doc-chip__name">{result.document.title || filename}</span>
+              <span className="doc-chip__meta">
+                {result.document.pages} pages · {result.document.language.toUpperCase()}
+                {sampleMode ? ' · sample' : ''}
+              </span>
+            </div>
+          )}
+
+          <div className="header-actions">
+            {showHeaderActions ? (
+              <>
                 <button
                   type="button"
-                  className="primary-button primary-button--small"
-                  aria-haspopup="menu"
-                  aria-expanded={exportOpen}
-                  onClick={() => setExportOpen((open) => !open)}
-                  disabled={exporting !== null}
+                  className="tool-button tool-button--icon"
+                  title={
+                    direction === 'LR'
+                      ? 'Switch to vertical layout'
+                      : 'Switch to horizontal layout'
+                  }
+                  onClick={() => setDirection((current) => (current === 'LR' ? 'TB' : 'LR'))}
                 >
-                  <DownloadIcon size={16} />
-                  {exporting ? `Exporting ${exporting.toUpperCase()}…` : 'Export'}
-                  <ChevronIcon size={14} />
+                  {direction === 'LR' ? <ExpandIcon size={16} /> : <CollapseIcon size={16} />}
+                  <span>{direction === 'LR' ? 'Vertical' : 'Horizontal'}</span>
                 </button>
-                {exportOpen && (
-                  <div className="export-dropdown" role="menu">
-                    <button type="button" role="menuitem" onClick={() => void handleExport('json')}>
-                      <strong>JSON</strong>
-                      <span>Full canonical result</span>
-                    </button>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => void handleExport('markdown')}
-                    >
-                      <strong>Markdown</strong>
-                      <span>Outline with summaries</span>
-                    </button>
-                    <button type="button" role="menuitem" onClick={() => void handleExport('png')}>
-                      <strong>PNG</strong>
-                      <span>Current view snapshot</span>
-                    </button>
-                    <button type="button" role="menuitem" onClick={() => void handleExport('svg')}>
-                      <strong>SVG</strong>
-                      <span>Vector snapshot</span>
-                    </button>
-                  </div>
-                )}
-              </div>
+                <button
+                  type="button"
+                  className="tool-button tool-button--icon"
+                  onClick={() => setFitSignal((value) => value + 1)}
+                >
+                  <FitIcon size={16} />
+                  <span>Fit</span>
+                </button>
+                <div className="export-menu" ref={menuRef}>
+                  <button
+                    type="button"
+                    className="primary-button primary-button--small"
+                    aria-haspopup="menu"
+                    aria-expanded={exportOpen}
+                    onClick={() => setExportOpen((open) => !open)}
+                    disabled={exporting !== null}
+                  >
+                    <DownloadIcon size={16} />
+                    {exporting ? `Exporting ${exporting.toUpperCase()}…` : 'Export'}
+                    <ChevronIcon size={14} />
+                  </button>
+                  {exportOpen && (
+                    <div className="export-dropdown" role="menu">
+                      <button type="button" role="menuitem" onClick={() => void handleExport('json')}>
+                        <strong>JSON</strong>
+                        <span>Full canonical result</span>
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => void handleExport('markdown')}
+                      >
+                        <strong>Markdown</strong>
+                        <span>Outline with leaf explanations</span>
+                      </button>
+                      <button type="button" role="menuitem" onClick={() => void handleExport('png')}>
+                        <strong>PNG</strong>
+                        <span>Current view snapshot</span>
+                      </button>
+                      <button type="button" role="menuitem" onClick={() => void handleExport('svg')}>
+                        <strong>SVG</strong>
+                        <span>Vector snapshot</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <button type="button" className="tool-button" onClick={reset}>
+                  <ArrowLeftIcon size={16} />
+                  <span>New PDF</span>
+                </button>
+              </>
+            ) : screen === 'generating' ? (
               <button type="button" className="tool-button" onClick={reset}>
                 <ArrowLeftIcon size={16} />
-                <span>New PDF</span>
+                <span>Back</span>
               </button>
-            </>
-          ) : screen === 'generating' ? (
-            <button type="button" className="tool-button" onClick={reset}>
-              <ArrowLeftIcon size={16} />
-              <span>Back</span>
-            </button>
-          ) : null}
+            ) : null}
+          </div>
         </div>
       </header>
 
@@ -328,6 +337,11 @@ export default function App() {
         <FileUpload
           busy={false}
           serverError={error?.message ?? null}
+          llmWarning={
+            llmConfigured === false
+              ? 'The backend has no LLM API key. Add API_KEY=... to backend/.env and restart the backend, or run it with LLM_PROVIDER=mock for the offline demo.'
+              : null
+          }
           onStart={handleStart}
           onSample={handleSample}
         />
@@ -343,28 +357,18 @@ export default function App() {
       )}
 
       {screen === 'map' && result && (
-        <main className={`map-screen ${selectedNode ? 'has-panel' : ''}`}>
-          <div className="map-tip">Click a node for details · drag to pan · scroll to zoom</div>
+        <main className="map-screen">
+          <div className="map-tip">Click branch arrows to expand · drag to pan · scroll to zoom</div>
           <MindMapCanvas
             result={result}
             collapsed={collapsed}
             direction={direction}
-            selectedId={selectedId}
             fitSignal={fitSignal}
-            flowRef={flowRef}
+            exportRef={flowExportRef}
             onToggle={handleToggle}
-            onSelect={setSelectedId}
             onExpandAll={() => setCollapsed(new Set())}
             onCollapseAll={handleCollapseAll}
           />
-          {selectedNode && (
-            <NodePanel
-              node={selectedNode}
-              root={result.mindmap}
-              onClose={() => setSelectedId(null)}
-              onSelect={setSelectedId}
-            />
-          )}
         </main>
       )}
 

@@ -55,6 +55,15 @@ class OpenAICompatibleClient(LLMClient):
         self._owns_client = http_client is None
         self._client = http_client or httpx.AsyncClient(timeout=settings.llm_timeout_seconds)
 
+    def configuration_error(self) -> str | None:
+        """Check the required key before making any network call."""
+        if not self._settings.llm_api_key:
+            return (
+                "No LLM API key configured. Set API_KEY=... in backend/.env "
+                "(or use LLM_PROVIDER=mock for an offline demo) and restart the backend."
+            )
+        return None
+
     async def _post(self, body: dict[str, Any], headers: dict[str, str]) -> httpx.Response:
         url = f"{self._settings.llm_base_url.rstrip('/')}/chat/completions"
         last_error: Exception | None = None
@@ -96,11 +105,9 @@ class OpenAICompatibleClient(LLMClient):
     ) -> dict[str, Any]:
         """Call the provider and return a parsed JSON object."""
         settings = self._settings
-        if not settings.llm_api_key:
-            raise LLMError(
-                "No LLM API key configured. Set API_KEY in the backend environment "
-                "(or use LLM_PROVIDER=mock for an offline demo)."
-            )
+        problem = self.configuration_error()
+        if problem:
+            raise LLMError(problem)
 
         system = system_prompt
         body: dict[str, Any] = {

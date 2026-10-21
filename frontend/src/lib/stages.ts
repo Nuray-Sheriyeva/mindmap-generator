@@ -2,18 +2,27 @@ import type { PipelineStage } from '../types/mindmap';
 
 /** Mirrors the backend stage sequence (graph/state.py). */
 export const PIPELINE_STAGES: PipelineStage[] = [
-  { key: 'parse_pdf', label: 'Parse PDF', description: 'Extract text and detect headings' },
-  { key: 'chunk_document', label: 'Chunk', description: 'Split into page-aware chunks' },
+  { key: 'parse_pdf', label: 'Parse PDF', description: 'Extract pages and headings' },
   {
-    key: 'summarize_chunks',
-    label: 'Summarize',
-    description: 'Extract grounded concepts in parallel',
+    key: 'classify_sections',
+    label: 'Classify',
+    description: 'Separate content from objectives and activities',
   },
-  { key: 'build_hierarchy', label: 'Build tree', description: 'Reduce into one mind map' },
+  { key: 'chunk_document', label: 'Chunk', description: 'Split content into page-aware chunks' },
+  {
+    key: 'extract_concepts',
+    label: 'Extract concepts',
+    description: 'Grounded term → explanation cards',
+  },
+  {
+    key: 'build_hierarchy',
+    label: 'Cluster ideas',
+    description: 'Group concepts into categories',
+  },
   {
     key: 'validate_and_repair',
     label: 'Validate',
-    description: 'Check schema, depth and duplicates',
+    description: 'Check grounding, style and coverage',
   },
   { key: 'finalize', label: 'Finalize', description: 'Assign IDs and metadata' },
 ];

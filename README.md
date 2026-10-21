@@ -1,16 +1,42 @@
 # Mind Map Generator
 
-Upload a text-based PDF and get an **interactive, hierarchical mind map** of its content — a
-NotebookLM-style explorer with pan/zoom, expand/collapse, source-page citations and
-JSON/Markdown/PNG/SVG export.
+Turn a text-based PDF into an **interactive, concept-first mind map** — a NotebookLM-style
+knowledge map where category nodes are clean generalizations and every leaf carries a visible,
+grounded explanation with source-page citations.
 
-The backend extracts the document structure (PDF outline → font/bold heuristics → numbering
-patterns), summarizes chunks with a structured-output LLM, merges them into one grounded tree,
-validates/repairs it, and exposes the result through an async job API. The frontend polls the
-job, renders the tree with React Flow + Dagre, and lets you drill into every node.
+The UI is inspired by **WONK’s** dark-ink / cream / violet visual language (Onest + Manrope),
+with a focused upload flow that exposes only the output-language choice.
 
-> **Grounding rule:** every node must be supported by the uploaded PDF and carries
-> `source_pages`. The prompts explicitly forbid outside knowledge.
+> **Grounding rule:** every leaf explanation must come from the uploaded PDF, cite real pages,
+> and pass style + grounding validation. Learning objectives and activities are never turned
+> into map nodes.
+
+---
+
+## What changed in the concept-first version
+
+- **No click-to-reveal content.** There is no node side panel and no summary hidden in the data.
+  The map itself carries the content, so PNG/SVG/Markdown exports keep the explanations.
+- **Branch vs leaf schema.** `root`/`branch` nodes contain only a label and children. `leaf`
+  nodes contain the term, a declarative explanation, and `source_pages`.
+- **Concept cards, not section summaries.** Content sections are converted into grounded
+  term → explanation cards with evidence quotes. Glossary definitions are used as evidence.
+- **Semantic clustering.** A second LLM call groups concept IDs into 4–8 categories (and
+  optional subgroups) instead of copying document headings.
+- **Scaffold filtering.** “Learning Objectives”, “Activities”, “Knowledge Check”,
+  “Suggested Answers”, “Final Takeaway”, metadata and how-to-use sections are excluded.
+  Objectives are passed to the prompts only as a coverage checklist.
+- **Quality gates.** Imperative/task language (“Explain…”, “Describe…”), low source overlap,
+  empty categories, duplicate IDs, missing concepts, over-wide groups and scaffold labels trigger
+  targeted repair or a clear `502`.
+- **Deterministic structural repair.** Before asking the LLM to retry, the cluster plan is
+  normalized: unknown/duplicate IDs are dropped, unplaced concepts are assigned by content
+  overlap, wide subgroups are split, tiny categories are merged, and scaffold labels are renamed.
+  The LLM repair path is reserved for concept style/grounding problems that cannot be fixed
+  deterministically. This prevents a good concept inventory from failing because of grouping
+  bookkeeping alone.
+- **Readable initial view + high-resolution export.** The canvas opens focused on the root at a
+  readable zoom; PNG/SVG export renders the complete graph at high resolution.
 
 ---
 
@@ -36,27 +62,43 @@ flowchart LR
 ```mermaid
 flowchart TD
     S([START]) --> PARSE["parse_pdf"]
-    PARSE --> CHUNK["chunk_document"]
-    CHUNK -->|"total text ≤ SINGLE_CALL_CHAR_LIMIT"| BUILD["build_hierarchy"]
-    CHUNK -->|"long document"| MAP["summarize_chunks<br/>concurrent, capped"]
-    MAP --> BUILD
-    BUILD --> VALIDATE["validate_and_repair"]
+    PARSE --> CLASSIFY["classify_sections"]
+    CLASSIFY --> CHUNK["chunk_document"]
+    CHUNK --> EXTRACT["extract_concepts<br/>map, concurrent"]
+    EXTRACT --> CLUSTER["build_hierarchy<br/>semantic cluster"]
+    CLUSTER --> VALIDATE["validate_and_repair"]
     VALIDATE -->|"valid"| FINAL["finalize"]
-    VALIDATE -->|"invalid & attempts < MAX_REPAIR_ATTEMPTS"| REPAIR["request_repair"]
+    VALIDATE -->|"concept style/grounding errors"| REPAIR["request_repair<br/>concepts or clusters"]
+    VALIDATE -->|"cluster structure errors"| REPAIR
     REPAIR --> VALIDATE
-    VALIDATE -->|"invalid & retries exhausted"| FAIL["GenerationError → 502"]
+    VALIDATE -->|"retries exhausted"| FAIL["GenerationError → 502"]
     FINAL --> E([END])
 ```
 
 | Stage | Input → output |
 | --- | --- |
-| `parse_pdf` | PDF bytes → cleaned pages, detected headings, `sections[]` with page ranges |
-| `chunk_document` | sections → page-aware chunks (char budget + overlap) |
-| `summarize_chunks` | chunks → grounded summaries/concepts/terms (map, concurrent) |
-| `build_hierarchy` | full text (short) or chunk summaries (long) → draft tree (reduce) |
-| `validate_and_repair` | draft → repaired tree or validation errors for the repair loop |
-| `request_repair` | draft + errors → corrected draft (max 2 attempts) |
-| `finalize` | tree → stable IDs, counts, metadata, cache entry |
+| `parse_pdf` | PDF bytes → cleaned pages, sections and page ranges |
+| `classify_sections` | sections → `content / objectives / activities / reference / scaffold` + objectives checklist |
+| `chunk_document` | content/reference sections → page-aware chunks with overlap |
+| `extract_concepts` | chunks → grounded concept cards (`term`, `explanation`, `evidence`, pages) |
+| `build_hierarchy` | concept inventory → categories/subgroups assigning every concept ID |
+| `validate_and_repair` | concepts + cluster → repaired tree, or targeted repair prompts |
+| `finalize` | tree → stable path IDs, counts, metadata, cache entry |
+
+---
+
+## Frontend
+
+- React 18 + TypeScript + Vite, **React Flow** (`@xyflow/react`) + **Dagre**.
+- WONK-inspired design system: `#0a0a12` ink, `#f7f7fb` cream, `#7c5cff` violet,
+  **Onest** for display and **Manrope** for body text.
+- Dark rounded header, dark hero, cream workspace, violet primary actions, rounded cards.
+- Expand/collapse branch chevrons, pan/zoom, fit view, horizontal/vertical toggle.
+- Leaves are white cards with the term, explanation and page reference visible on the map.
+- No node click handlers, selection, side panel or hover summaries.
+- Upload screen exposes **only the output-language dropdown**; depth/branch controls are gone.
+- Exports: JSON, Markdown outline, full-graph PNG and SVG.
+- Bundled curated sample map (`src/data/sample-mindmap.json`) renders without a backend.
 
 ---
 
@@ -65,28 +107,28 @@ flowchart TD
 ```
 .
 ├── backend/
-│   ├── pyproject.toml            # uv-managed project, no requirements.txt
+│   ├── pyproject.toml            # uv-managed project
 │   ├── .env.example
 │   ├── src/mindmap_generator/
-│   │   ├── api/                  # main.py (app factory/lifespan), routes, schemas, deps
-│   │   ├── pdf/                  # extract.py, headings.py, clean.py, types.py
-│   │   ├── graph/                # state.py, nodes.py, builder.py, validate.py
-│   │   ├── llm/                  # base.py, openai_compat.py, mock.py, factory.py
-│   │   ├── prompts/              # templates.py (all LLM prompts live here)
-│   │   ├── jobs/                 # store.py, cache.py, runner.py, exports.py
+│   │   ├── api/                  # app factory/lifespan, routes, schemas, deps
+│   │   ├── pdf/                  # extraction, cleaning, headings, classify.py
+│   │   ├── graph/                # state, nodes, builder, concepts, validate
+│   │   ├── llm/                  # base, openai_compat, mock, factory
+│   │   ├── prompts/              # concept extraction / clustering / repair prompts
+│   │   ├── jobs/                 # store, cache, runner, exports
 │   │   ├── chunking.py
-│   │   ├── config.py             # pydantic-settings
-│   │   ├── models.py             # Pydantic schema + LLM output schemas
-│   │   ├── languages.py          # script/stop-word language detection
-│   │   └── logging_config.py     # structured JSON logs with job_id
+│   │   ├── config.py
+│   │   ├── models.py             # schema v2 + LLM output schemas
+│   │   ├── languages.py
+│   │   └── logging_config.py
 │   └── tests/                    # pytest + httpx TestClient, LLM always mocked
 ├── frontend/
 │   ├── package.json
 │   ├── src/
-│   │   ├── components/           # upload, progress, canvas, node, side panel
-│   │   ├── lib/                  # api client, tree utils, Dagre layout, exports
-│   │   ├── data/                 # sample mind map JSON
-│   │   └── types/                # TypeScript mirror of the API schema
+│   │   ├── components/           # upload, progress, canvas, nodes, icons
+│   │   ├── lib/                  # api, tree, Dagre layout, exports
+│   │   ├── data/                 # curated sample map
+│   │   └── types/                # TypeScript mirror of schema v2
 │   └── ...
 ├── README.md
 └── .gitignore
@@ -94,53 +136,70 @@ flowchart TD
 
 ---
 
-## Mind map schema
-
-The backend (`models.py`) and frontend (`types/mindmap.ts`) share this shape. Do not change one
-side without the other.
+## Mind map schema (version 2)
 
 ```json
 {
   "document": {
-    "filename": "paper.pdf",
-    "pages": 12,
+    "filename": "lesson.pdf",
+    "pages": 7,
     "language": "en",
-    "title": "Photosynthesis"
+    "title": "Large Language Models (LLMs)"
   },
   "mindmap": {
     "id": "root",
-    "label": "Photosynthesis",
-    "summary": "One or two sentences.",
-    "source_pages": [1, 2],
+    "kind": "root",
+    "label": "Large Language Models (LLMs)",
+    "source_pages": [],
     "children": [
       {
-        "id": "root.1",
-        "label": "Light Reactions",
-        "summary": "Short summary.",
-        "source_pages": [2],
-        "children": []
+        "id": "root.2",
+        "kind": "branch",
+        "label": "Core Concepts",
+        "source_pages": [],
+        "children": [
+          {
+            "id": "root.2.1",
+            "kind": "leaf",
+            "label": "Tokens",
+            "explanation": "Tokens are units of text processing—words, parts of words, or symbols—that the model reads and predicts.",
+            "source_pages": [2],
+            "children": []
+          }
+        ]
       }
     ]
   },
   "meta": {
+    "schema_version": 2,
     "model": "gpt-4o-mini",
     "generated_at": "2025-01-15T10:30:00Z",
-    "node_count": 29,
+    "node_count": 50,
+    "leaf_count": 39,
+    "branch_count": 10,
     "depth": 3,
     "cache_hit": false,
     "repair_attempts": 0,
-    "generation_path": "map_reduce",
+    "generation_path": "concept_clustering",
     "output_language": "en",
     "processing_ms": 8421,
-    "fixes": []
+    "fixes": [],
+    "warnings": []
   }
 }
 ```
 
-Rules enforced by prompts + validator: labels ≤ ~6 words, summaries 1–2 sentences, max 3
-levels below the root, 2–8 main branches, up to 6 children, no duplicate siblings, pages clamped
-to the document, no cycles (JSON cannot represent them; a defensive check rejects shared
-references).
+Rules enforced by the prompts and validator:
+
+- `root`/`branch`: label + children only; **no explanation**.
+- `leaf`: non-empty explanation, source pages, **no children**.
+- Leaf explanations: declarative, roughly 5–32 words, grounded, no task/learning-objective
+  language, no meta commentary.
+- Category labels: 1–4 words, conceptual, no scaffold headings.
+- 3–8 categories (the prompt asks for 4–8; 3 is accepted for smaller inventories), every
+  concept ID assigned exactly once, 1–6 leaves per subgroup, maximum depth of 3 below the root.
+- Evidence quotes are normalized and checked against the cited pages; content-word overlap with
+  the page text is a second grounding check.
 
 ---
 
@@ -149,11 +208,9 @@ references).
 > **Run the backend and frontend in two separate terminals.** The backend command must be run
 > from `backend/`; the Python package is installed into `backend/.venv` by `uv sync`. Running
 > `uv run uvicorn ...` from `frontend/` gives `ModuleNotFoundError: No module named
-> 'mindmap_generator'` and makes uvicorn watch the wrong directory.
+> 'mindmap_generator'`.
 
 **Terminal 1 — backend:**
-
-### Backend (Python 3.11+, uv)
 
 ```bash
 cd backend
@@ -167,7 +224,10 @@ uv run uvicorn mindmap_generator.api.main:app --reload --port 8000
 - API docs: <http://127.0.0.1:8000/docs>
 - Health: <http://127.0.0.1:8000/health>
 
-If port 8000 is already taken, use another port and point the frontend proxy at it:
+> The backend loads `.env` from its **current working directory**, so start it from
+> `backend/`. After editing `.env`, restart uvicorn.
+
+If port 8000 is already taken:
 
 ```bash
 uv run uvicorn mindmap_generator.api.main:app --reload --port 8010
@@ -176,8 +236,6 @@ VITE_BACKEND_URL=http://127.0.0.1:8010 npm run dev
 ```
 
 **Terminal 2 — frontend:**
-
-### Frontend (Node 18+)
 
 ```bash
 cd frontend
@@ -196,19 +254,40 @@ npm run build      # tsc --noEmit && vite build → frontend/dist
 > `~/.npm`, install with `npm install --cache "$PWD/.npm-cache"`. Both cache folders are
 > gitignored.
 
-If the API is on another origin, set `VITE_API_BASE_URL` at build time and add that frontend
-origin to `CORS_ORIGINS` on the backend.
-
 ### Tests
 
 ```bash
-(cd backend && uv run pytest)        # 48 tests: PDF, chunking, validation, graph, API
-(cd frontend && npm test)            # tree, layout and export utilities
+(cd backend && uv run pytest)        # 65 tests: PDF, classification, concepts, validation, language, LLM config, graph, API
+(cd frontend && npm test)            # 16 tests: tree, layout, exports
 (cd frontend && npm run build)       # type-check + production bundle
 ```
 
 Tests never call an LLM and never need an API key: they inject a scripted `FakeLLMClient` or use
 `LLM_PROVIDER=mock`. PDF fixtures are generated programmatically with PyMuPDF.
+
+### Troubleshooting: “Every concept-extraction call failed”
+
+This error usually means the backend has **no usable LLM configuration**, not that OpenAI is
+down. It fails before any network request when `API_KEY` is empty.
+
+Check it without exposing the key:
+
+```bash
+cd backend
+uv run python -c "from mindmap_generator.config import Settings; s = Settings(); print('key present:', bool(s.llm_api_key), '| provider:', s.llm_provider, '| model:', s.llm_model)"
+```
+
+- `key present: False` → put `API_KEY=sk-...` in `backend/.env` (or export it in the terminal)
+  and restart the backend. Do not commit `.env`.
+- `key present: True` but the job still fails → check `GET /health` (`llm_configured`), then the
+  provider dashboard for quota/billing, the model name, and whether the provider supports
+  `response_format: json_schema` (use `LLM_JSON_MODE=json_object` if not).
+- Run uvicorn from `backend/` so `.env` is found.
+- No key available? `LLM_PROVIDER=mock uv run uvicorn mindmap_generator.api.main:app --reload --port 8000`
+  runs the deterministic offline demo.
+
+The failed job now returns the concrete cause:
+`No LLM API key configured. Set API_KEY=... in backend/.env ...`.
 
 ### Offline demo
 
@@ -217,17 +296,13 @@ cd backend
 LLM_PROVIDER=mock uv run uvicorn mindmap_generator.api.main:app --reload --port 8000
 ```
 
-`mock` is a deterministic heuristic extractor for demos/smoke tests, **not** a language model.
-It always produces a schema-valid tree from the grounded outline/concepts in the prompt. The
-frontend also has an **Explore a sample map** button that renders the bundled sample JSON
-without a backend.
+The `mock` provider is a deterministic heuristic extractor for demos/smoke tests, **not** a
+language model. For real content quality, configure an LLM provider. The frontend also has an
+**Explore a sample map** action that renders the curated 50-node lesson map without a backend.
 
 ---
 
 ## Environment variables
-
-All variables are optional except an LLM key (or `LLM_PROVIDER=mock`) for real generation.
-See `backend/.env.example` for the full list.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
@@ -236,19 +311,25 @@ See `backend/.env.example` for the full list.
 | `LLM_BASE_URL` | `https://api.openai.com/v1` | Compatible endpoint base URL |
 | `API_KEY` (or `LLM_API_KEY`) | — | Provider secret; never committed |
 | `LLM_JSON_MODE` | `json_schema` | Structured output; use `json_object` if unsupported |
-| `LLM_CONCURRENCY` | `4` | Max concurrent map-step calls |
-| `MAX_UPLOAD_MB` | `25` | Upload limit (also enforced while streaming) |
+| `LLM_CONCURRENCY` | `4` | Max concurrent concept-extraction calls |
+| `LLM_MAX_OUTPUT_TOKENS` | `8192` | Output budget for clustering/repair |
+| `MAX_UPLOAD_MB` | `25` | Upload limit |
 | `MAX_PAGES` | `500` | Page limit |
-| `CHUNK_CHARS` / `CHUNK_OVERLAP_CHARS` | `6000` / `300` | Chunking budget |
-| `SINGLE_CALL_CHAR_LIMIT` | `12000` | Below this, skip map-reduce |
-| `MAX_INPUT_CHARS` | `48000` | Single-call prompt truncation guard |
-| `DEFAULT_MAX_DEPTH` / `MAX_DEPTH_LIMIT` | `3` / `3` | Supported: 2–3 levels below root |
-| `DEFAULT_MAX_BRANCHES` | `6` | Main branches (request may override) |
-| `MAX_REPAIR_ATTEMPTS` | `2` | Validation repair retries |
-| `CORS_ORIGINS` | `["http://localhost:5173","http://127.0.0.1:5173"]` | JSON list |
-| `CACHE_ENABLED` | `true` | Cache completed results by file hash + options |
+| `CHUNK_CHARS` / `CHUNK_OVERLAP_CHARS` | `6000` / `300` | Concept-extraction chunking |
+| `DEFAULT_MAX_DEPTH` / `MAX_DEPTH_LIMIT` | `3` / `3` | Levels below root |
+| `DEFAULT_MAX_BRANCHES` / `MAX_BRANCHES_LIMIT` | `7` / `8` | Main category limits |
+| `MAX_CHILDREN` | `6` | Max concept IDs per subgroup |
+| `MAX_CONCEPTS` | `120` | Concept inventory cap |
+| `MIN_LEAF_WORDS` / `MAX_LEAF_WORDS` | `5` / `32` | Leaf explanation length |
+| `MIN_GROUNDING_OVERLAP` | `0.2` | Minimum content-word overlap with cited pages |
+| `MAX_REPAIR_ATTEMPTS` | `2` | Concept/cluster repair attempts |
+| `CACHE_ENABLED` | `true` | Cache by file hash + options |
 | `JOB_TTL_MINUTES` | `60` | In-memory job expiry |
+| `CORS_ORIGINS` | `["http://localhost:5173","http://127.0.0.1:5173"]` | JSON list |
 | `LOG_LEVEL` | `INFO` | Structured JSON logs |
+
+The API still accepts optional `max_depth` and `max_branches` form fields for scripted callers;
+the frontend intentionally exposes only the language dropdown.
 
 ---
 
@@ -256,7 +337,7 @@ See `backend/.env.example` for the full list.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET` | `/health` | Liveness + effective provider/model |
+| `GET` | `/health` | Liveness + effective provider/model + `llm_configured` |
 | `POST` | `/mindmaps` | Upload PDF, create background job → `202 {job_id}` |
 | `GET` | `/mindmaps/{job_id}` | Poll status/stage/progress/result/error |
 | `GET` | `/mindmaps/{job_id}/export?format=json\|markdown` | Download export |
@@ -268,9 +349,7 @@ See `backend/.env.example` for the full list.
 curl -s http://127.0.0.1:8000/health
 
 curl -s -X POST http://127.0.0.1:8000/mindmaps \
-  -F "file=@paper.pdf;type=application/pdf" \
-  -F "max_depth=3" \
-  -F "max_branches=6" \
+  -F "file=@lesson.pdf;type=application/pdf" \
   -F "language=en"
 # → {"job_id":"…","status":"pending","status_url":"/mindmaps/…"}
 
@@ -279,9 +358,6 @@ curl -s http://127.0.0.1:8000/mindmaps/<job_id>
 curl -OJ "http://127.0.0.1:8000/mindmaps/<job_id>/export?format=json"
 curl -s "http://127.0.0.1:8000/mindmaps/<job_id>/export?format=markdown"
 ```
-
-`POST /mindmaps` parameters are multipart form fields: `file` (required), `max_depth` (2–3),
-`max_branches` (2–12), `language` (optional ISO code; omit/`auto` to mirror the document).
 
 Status codes:
 
@@ -293,18 +369,16 @@ Status codes:
 | `413` | Upload exceeds size limit |
 | `415` | Wrong extension or MIME type |
 | `422` | Invalid/corrupt/encrypted PDF, page limit, no text, invalid params |
-| `502` | LLM provider failure or generation could not be validated |
+| `502` | LLM failure or generation could not pass validation |
 
-Polling a failed job returns the **original failure code** with the job payload, so clients can
-distinguish bad input (`422`) from retryable provider errors (`502`). Every error uses
+Polling a failed job returns the original failure code with the job payload. Errors use
 `{"error": {"code", "message", "status_code", "details"}}`.
 
 ---
 
 ## Swapping the LLM provider
 
-The default client speaks the OpenAI **chat completions** protocol with JSON-schema structured
-outputs. Changing provider rarely requires code:
+The client speaks the OpenAI **chat completions** protocol with JSON-schema structured outputs:
 
 ```bash
 # DeepSeek (use json_object if json_schema is unavailable)
@@ -316,75 +390,81 @@ API_KEY=...
 # Local Ollama
 LLM_BASE_URL=http://localhost:11434/v1
 LLM_MODEL=llama3.1
-API_KEY=ollama          # required by the client, value is not validated locally
+API_KEY=ollama
 
 # OpenRouter / Groq / vLLM / Together — same pattern
 LLM_BASE_URL=https://openrouter.ai/api/v1
 LLM_MODEL=anthropic/claude-3.5-sonnet
 ```
 
-The model must return JSON. `json_schema` is preferred; `json_object` embeds the schema in the
-system prompt and still validates the result with Pydantic. To add a provider that is not
-OpenAI-compatible, implement `LLMClient.generate_json()` in `backend/src/mindmap_generator/llm/`
-and register it in `factory.py` — no graph or API changes required.
+A stronger model generally improves concept extraction and category naming. For a
+non-OpenAI-compatible provider, implement `LLMClient.generate_json()` in
+`backend/src/mindmap_generator/llm/` and register it in `factory.py`.
 
 ---
 
 ## Design notes / assumptions
 
-- **Heading priority:** PDF bookmarks → font size/bold heuristics → numbering patterns
-  (`1.`, `1.1`, `Chapter 4`, `Глава 2`). If none are found, the document becomes one section.
-- **Language:** lightweight script + stop-word detection (English, Russian, Kazakh, Ukrainian,
-  German, French, Spanish, Portuguese, Italian, Arabic, Chinese, Japanese, Korean). The
-  `language` request field overrides the output language.
-- **Page refs:** 1-based; LLM-proposed pages are clamped to the document and inherited from the
-  parent when missing (the root falls back to page 1 if the model returns none). Nodes never cite
-  pages outside the PDF.
-- **`max_depth`:** levels *below* the root (default 3). The structured-output schema is
-  fixed-depth (root + 3); deeper output is truncated and the requested lower depth is enforced.
-- **Cache:** keyed by SHA-256(file) + generation options. In-memory LRU.
-- **Jobs:** FastAPI `BackgroundTasks`; polling (1 s) on the client.
-- **Exports:** JSON/Markdown are generated from the canonical result (client and backend);
-  PNG/SVG are client-side snapshots of the current viewport via `html-to-image`.
+- **Heading priority:** PDF bookmarks → font size/bold heuristics → numbering patterns. Section
+  classification then decides which sections are content/reference vs objectives/activities/
+  metadata.
+- **Objectives** are never nodes. They are extracted and passed to extraction/clustering as a
+  coverage checklist.
+- **Glossary** sections are treated as reference evidence; the glossary becomes definitions, not
+  a branch.
+- **Leaves** are the only nodes with explanations; every explanation has `source_pages` and a
+  validated evidence quote where possible.
+- **Categories** are generated from concept cards, not document headings. Scaffold labels are
+  rejected by the validator.
+- **Page refs** are 1-based and clamped; missing pages fall back to the parent/cited pages.
+- **Language** is detected with a script/stop-word heuristic; the request’s `language` overrides
+  the output language and is reported in `meta.output_language`.
+- **Translated output:** terms, explanations and category labels are written in the requested
+  output language, while evidence quotes stay verbatim in the source language. Lexical grounding
+  overlap is skipped for translated output (translated words cannot match the source); the
+  evidence quote and page citation remain the grounding anchors.
+- **Language consistency:** for Cyrillic, CJK and Arabic targets the validator detects
+  English/source-language leaks. Concept leaks trigger concept repair; category-label leaks
+  trigger a focused label-translation call that preserves the cluster structure and concept IDs.
+- **Exports:** JSON/Markdown from the canonical result; PNG/SVG are full-graph, high-resolution
+  client-side renders (not just the viewport).
+- **Cache:** SHA-256(file) + generation options, in-memory LRU.
 
 ---
 
 ## Limitations
 
-- **Scanned PDFs are not supported** — there is no OCR; the API returns a clear
-  `no_extractable_text` error.
-- **In-memory job store/cache**: single-process only; jobs and cache are lost on restart and
-  are not shared across workers. Use Redis/Postgres for production.
-- **Background tasks are not durable**: a process restart cancels in-flight generation.
-- **Strict MIME check**: only `application/pdf` / `application/x-pdf`; clients sending
-  `application/octet-stream` are rejected with `415`.
-- **LLM quality varies**: structured-output support differs across providers; the validator
-  repairs and retries, but the tree is only as good as the model. Very long documents are
-  compressed through chunk summaries, which can lose nuance.
-- **Page citations can be coarse** for sections that span many pages, because the map step
-  receives a page set rather than character offsets.
-- **Prompt injection**: PDF text is untrusted input. Prompts instruct the model to ignore
-  instructions inside the document, but no prompt-level defense is perfect; treat generated
-  maps as untrusted content when publishing them.
-- **Image export** captures the current viewport; for a full-graph image, fit the view first.
-- **No auth, database, Docker, multi-user support, editing, SSE, or RAG Q&A** in the MVP.
-- **Language detection is heuristic**; very short or mixed-language documents may fall back to
-  English.
-- **No upload persistence**: PDF bytes live in memory only while the job runs.
+- **Scanned PDFs are not supported** — no OCR; the API returns `no_extractable_text`.
+- **In-memory job store/cache** — single-process only, lost on restart; use Redis/Postgres for
+  production.
+- **BackgroundTasks are not durable** — a process restart cancels in-flight jobs.
+- **LLM quality matters** — extraction/clustering quality depends on the model; the validator
+  can repair but cannot invent depth.
+- **Mock mode is heuristic** — useful for offline demos, not a substitute for a real model.
+- **Strict MIME check** — only `application/pdf` / `application/x-pdf`.
+- **Page citations can be coarse** for sections spanning many pages.
+- **Language detection is heuristic** for short or mixed-language documents.
+- **Translation quality** depends on the model. `gpt-4o-mini` now translates successfully in
+  testing, but a stronger model will produce more natural labels/explanations and fewer
+  near-duplicate concepts.
+- **Prompt injection** — document text is untrusted; prompts instruct the model to ignore
+  embedded instructions, but this is not a perfect defense.
+- **No auth, database, Docker, multi-user support, node editing, SSE, or RAG Q&A** in this MVP.
+- **No upload persistence** — PDF bytes live in memory only while the job runs.
 
 ---
 
 ## Roadmap
 
-- OCR (e.g. Tesseract/PaddleOCR) for scanned PDFs.
-- Click a node → ask a follow-up question with RAG over the document chunks.
+- OCR for scanned PDFs.
+- Click a leaf to ask a grounded follow-up question (RAG over page chunks).
 - Merge multiple PDFs into one map.
-- Edit labels/summaries in the UI and save a version.
-- SSE/WebSocket streaming instead of polling.
-- Persistent job store + cache (Redis), optional Postgres metadata.
-- Export to OPML/FreeMind and a full-graph PNG (not just the viewport).
-- Authentication, per-user quotas and audit logs.
-- Better layout options (radial, compact) and keyboard navigation.
+- Edit labels/explanations in the UI and save versions.
+- SSE/WebSocket progress instead of polling.
+- Redis-backed jobs/cache and optional Postgres metadata.
+- Authentication, quotas and audit logs.
+- True radial layout and keyboard/accessibility improvements.
+- Export a paginated PDF of the full map.
 
 ---
 
@@ -394,3 +474,4 @@ and register it in `factory.py` — no graph or API changes required.
 - Uploaded PDFs are parsed in memory and never written to disk by the API.
 - Error payloads avoid echoing credentials; provider error bodies are truncated.
 - CORS origins are explicit and configurable.
+- The frontend never receives API keys.

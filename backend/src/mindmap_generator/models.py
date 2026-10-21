@@ -1,24 +1,44 @@
-"""Shared Pydantic models: final mind map schema and LLM output schemas."""
+"""Shared Pydantic models: canonical mind map schema and LLM output schemas."""
 
 from __future__ import annotations
 
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+NodeKind = Literal["root", "branch", "leaf"]
+SectionKind = Literal["content", "objectives", "activities", "reference", "scaffold"]
 
 
 # ---------------------------------------------------------------------------
-# Final API / persistence schema
+# Final API / persistence schema (schema_version = 2)
 # ---------------------------------------------------------------------------
 class MindMapNode(BaseModel):
-    """One mind map node. ``children`` is empty for leaves."""
+    """One map node.
+
+    ``root``/``branch`` nodes are pure categories: label and children only.
+    ``leaf`` nodes carry the visible, grounded explanation and source pages.
+    """
 
     id: str = ""
+    kind: NodeKind
     label: str
-    summary: str = ""
+    explanation: str | None = None
     source_pages: list[int] = Field(default_factory=list)
     children: list[MindMapNode] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _validate_shape(self) -> MindMapNode:
+        if self.kind == "leaf":
+            if self.children:
+                raise ValueError("leaf nodes cannot have children")
+            if not (self.explanation or "").strip():
+                raise ValueError("leaf nodes require a non-empty explanation")
+        else:
+            if self.explanation:
+                raise ValueError("root/branch nodes must not carry an explanation")
+        return self
 
 
 class DocumentInfo(BaseModel):
@@ -33,16 +53,20 @@ class DocumentInfo(BaseModel):
 class MindMapMeta(BaseModel):
     """Generation metadata."""
 
+    schema_version: int = 2
     model: str
     generated_at: datetime
     node_count: int
+    leaf_count: int = 0
+    branch_count: int = 0
     depth: int
     cache_hit: bool = False
     repair_attempts: int = 0
-    generation_path: Literal["single_call", "map_reduce", "unknown"] = "unknown"
+    generation_path: str = "concept_clustering"
     output_language: str | None = None
     processing_ms: int = 0
     fixes: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
 
 
 class MindMapResult(BaseModel):
@@ -54,74 +78,103 @@ class MindMapResult(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Structured-output schemas given to the LLM (fixed depth: root + 3 levels)
+# Structured-output schemas
 # ---------------------------------------------------------------------------
 class _LLMBase(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class LLMLeafNode(_LLMBase):
-    label: str
-    summary: str
-    source_pages: list[int]
-
-
-class LLMLevel2Node(_LLMBase):
-    label: str
-    summary: str
-    source_pages: list[int]
-    children: list[LLMLeafNode]
-
-
-class LLMLevel1Node(_LLMBase):
-    label: str
-    summary: str
-    source_pages: list[int]
-    children: list[LLMLevel2Node]
-
-
-class LLMLevel0Node(_LLMBase):
-    """The root object requested from the hierarchy prompt."""
-
-    label: str
-    summary: str
-    source_pages: list[int]
-    children: list[LLMLevel1Node]
-
-
 class LLMConcept(_LLMBase):
-    label: str
-    summary: str
+    """A grounded concept card extracted from one source chunk."""
+
+    term: str
+    explanation: str
+    evidence: str
     source_pages: list[int]
 
 
-class LLMChunkSummary(_LLMBase):
-    summary: str
-    key_concepts: list[LLMConcept]
-    key_terms: list[str]
+class LLMConceptList(_LLMBase):
+    concepts: list[LLMConcept]
+
+
+class LLMRepairedConcept(_LLMBase):
+    id: str
+    term: str
+    explanation: str
+    evidence: str
+    source_pages: list[int]
+
+
+class LLMRepairedConceptList(_LLMBase):
+    concepts: list[LLMRepairedConcept]
+
+
+class LLMClusterGroup(_LLMBase):
+    """A subgroup of concept IDs inside one category.
+
+    Use an empty label when the category does not need a sub-category.
+    """
+
+    label: str
+    concept_ids: list[str]
+
+
+class LLMClusterCategory(_LLMBase):
+    label: str
+    groups: list[LLMClusterGroup]
+
+
+class LLMClusterOutput(_LLMBase):
+    """Semantic clustering of the concept inventory."""
+
+    root_label: str
+    categories: list[LLMClusterCategory]
+
+
+class LLMLabelTranslation(_LLMBase):
+    source: str
+    translated: str
+
+
+class LLMLabelTranslations(_LLMBase):
+    labels: list[LLMLabelTranslation]
 
 
 # ---------------------------------------------------------------------------
 # Internal pipeline models
 # ---------------------------------------------------------------------------
-class ChunkSummary(BaseModel):
-    """Map-step output attached to one document chunk."""
+class ConceptCard(BaseModel):
+    """Deduplicated, grounded concept used to build leaf nodes."""
 
-    chunk_id: str
-    section_title: str
-    section_level: int
-    summary: str
-    key_concepts: list[LLMConcept]
-    key_terms: list[str]
-    source_pages: list[int]
+    id: str
+    term: str
+    explanation: str
+    evidence: str = ""
+    source_pages: list[int] = Field(default_factory=list)
+    source_section: str = ""
+    section_kind: SectionKind = "content"
+
+
+class ClusterGroup(BaseModel):
+    label: str
+    concept_ids: list[str]
+
+
+class ClusterCategory(BaseModel):
+    label: str
+    groups: list[ClusterGroup]
+
+
+class ClusterPlan(BaseModel):
+    root_label: str
+    categories: list[ClusterCategory]
 
 
 class GenerationOptions(BaseModel):
-    """User-controlled generation knobs."""
+    """User-controlled generation knobs still accepted by the API."""
 
     max_depth: int = 3
-    max_branches: int = 6
-    max_children: int = 6
+    max_branches: int = 7
     language: str | None = None
 
 

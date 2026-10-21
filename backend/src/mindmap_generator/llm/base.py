@@ -16,6 +16,14 @@ class LLMClient(ABC):
     provider: str = "unknown"
     model: str = "unknown"
 
+    def configuration_error(self) -> str | None:
+        """Return a human-readable configuration problem, if any.
+
+        The graph checks this before starting expensive LLM work so the user
+        gets a clear error instead of a generic "all calls failed" message.
+        """
+        return None
+
     @abstractmethod
     async def generate_json(
         self,

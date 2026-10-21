@@ -17,6 +17,7 @@ export function ProgressPanel({ job, filename, error, onBack }: ProgressPanelPro
   return (
     <div className="progress-screen">
       <div className="progress-card">
+        <span className="progress-kicker">Concept-first pipeline</span>
         <div className="progress-card__header">
           <div className="progress-file">
             <span className="progress-file__icon">
@@ -36,7 +37,7 @@ export function ProgressPanel({ job, filename, error, onBack }: ProgressPanelPro
           {!failed && (
             <div className="spinner" aria-label="Generating">
               <span />
-			</div>
+            </div>
           )}
         </div>
 
@@ -48,19 +49,23 @@ export function ProgressPanel({ job, filename, error, onBack }: ProgressPanelPro
             <div>
               <strong>We couldn't finish this mind map</strong>
               <p>{error ?? job?.error?.message ?? 'An unexpected error occurred.'}</p>
-              {job?.error?.code ? (
-                <code className="error-code">{job.error.code}</code>
-              ) : null}
+              {job?.error?.code ? <code className="error-code">{job.error.code}</code> : null}
             </div>
           </div>
         ) : (
           <>
-            <div className="progress-bar" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
+            <div
+              className="progress-bar"
+              role="progressbar"
+              aria-valuenow={progress}
+              aria-valuemin={0}
+              aria-valuemax={100}
+            >
               <span style={{ width: `${Math.max(progress, job ? 3 : 2)}%` }} />
             </div>
             <div className="progress-meta">
               <span>{progress}%</span>
-              <span>{job?.cache_hit ? 'Cache hit' : 'LLM pipeline'}</span>
+              <span>{job?.cache_hit ? 'Cache hit' : 'Grounded concept extraction'}</span>
             </div>
             <ol className="stage-list">
               {PIPELINE_STAGES.map((stage, index) => {

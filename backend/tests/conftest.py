@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import copy
+import json
+import re
 from typing import Any
 
 import pymupdf
@@ -47,6 +49,24 @@ def build_sample_pdf() -> bytes:
     return doc.tobytes()
 
 
+def build_objectives_pdf() -> bytes:
+    """PDF whose first section is a learning-objectives section."""
+    doc = pymupdf.open()
+    page = _page(doc, 1)
+    page.insert_text((72, 80), "Cells", fontsize=22, fontname="hebo")
+    page.insert_text((72, 120), "1. Learning Objectives", fontsize=16, fontname="hebo")
+    page.insert_text((72, 150), "Explain what a cell membrane is.", fontsize=11)
+    page.insert_text((72, 168), "Describe the role of the nucleus.", fontsize=11)
+    page.insert_text((72, 186), "Distinguish plant and animal cells.", fontsize=11)
+
+    page = _page(doc, 2)
+    page.insert_text((72, 80), "2. Cell Structure", fontsize=16, fontname="hebo")
+    page.insert_text((72, 110), "A cell membrane controls what enters and leaves the cell.", fontsize=11)
+    page.insert_text((72, 128), "The nucleus stores genetic information.", fontsize=11)
+    page.insert_text((72, 146), "Plant cells have a cell wall and chloroplasts.", fontsize=11)
+    return doc.tobytes()
+
+
 def build_outline_pdf() -> bytes:
     """PDF with bookmarks so outline detection takes priority."""
     doc = pymupdf.open()
@@ -88,76 +108,261 @@ def build_encrypted_pdf() -> bytes:
     )
 
 
-def make_tree(*, branches: int = 4, children: int = 2, depth: int = 3) -> dict[str, Any]:
-    """Build a schema-valid hierarchy for fake LLM responses."""
+DEFAULT_CONCEPTS: list[dict[str, Any]] = [
+    {
+        "term": "Photosynthesis",
+        "explanation": "Photosynthesis converts light energy into chemical energy.",
+        "evidence": "Photosynthesis converts light energy into chemical energy.",
+        "source_pages": [1],
+    },
+    {
+        "term": "Chloroplasts",
+        "explanation": "Photosynthesis occurs in chloroplasts and produces oxygen.",
+        "evidence": "It occurs in chloroplasts and produces oxygen.",
+        "source_pages": [1],
+    },
+    {
+        "term": "Oxygen release",
+        "explanation": "Water splitting releases oxygen as a by-product of light reactions.",
+        "evidence": "They split water and release oxygen.",
+        "source_pages": [2],
+    },
+    {
+        "term": "Light reactions",
+        "explanation": "Light reactions occur in the thylakoid membrane and generate ATP and NADPH.",
+        "evidence": "Light reactions occur in the thylakoid membrane.",
+        "source_pages": [2],
+    },
+    {
+        "term": "Thylakoid membrane",
+        "explanation": "The thylakoid membrane is where light reactions take place.",
+        "evidence": "Light reactions occur in the thylakoid membrane.",
+        "source_pages": [2],
+    },
+    {
+        "term": "Calvin cycle",
+        "explanation": "The Calvin cycle fixes carbon dioxide into glucose using ATP and NADPH.",
+        "evidence": "The Calvin cycle fixes carbon dioxide into glucose.",
+        "source_pages": [2],
+    },
+    {
+        "term": "ATP and NADPH",
+        "explanation": "ATP and NADPH carry energy from light reactions into the Calvin cycle.",
+        "evidence": "It uses ATP and NADPH produced by the light reactions.",
+        "source_pages": [2],
+    },
+    {
+        "term": "Glucose",
+        "explanation": "The Calvin cycle produces glucose from carbon dioxide.",
+        "evidence": "The Calvin cycle fixes carbon dioxide into glucose.",
+        "source_pages": [2],
+    },
+    {
+        "term": "Agriculture",
+        "explanation": "Photosynthesis research informs agriculture and crop production.",
+        "evidence": "Photosynthesis research informs agriculture and renewable energy.",
+        "source_pages": [3],
+    },
+    {
+        "term": "Artificial photosynthesis",
+        "explanation": "Artificial photosynthesis aims to produce fuels from light.",
+        "evidence": "Artificial photosynthesis aims to produce fuels.",
+        "source_pages": [3],
+    },
+]
 
-    def leaf(label: str, page: int) -> dict[str, Any]:
-        return {
-            "label": label,
-            "summary": f"Evidence for {label} appears on page {page}.",
-            "source_pages": [page],
-            "children": [],
-        }
+CATEGORY_LABELS = ["Core Concepts", "Light Reactions", "Calvin Cycle", "Applications"]
 
-    root_children = []
-    for index in range(branches):
-        page = (index % 3) + 1
-        branch_children = []
-        for child_index in range(children):
-            child_label = f"Topic {index + 1}.{child_index + 1}"
-            sub_children = []
-            if depth >= 3 and child_index == 0:
-                sub_children = [leaf(f"Detail {index + 1}.{child_index + 1}", page)]
-            branch_children.append(
-                {
-                    "label": child_label,
-                    "summary": f"Sub-topic about element {index + 1}.",
-                    "source_pages": [page],
-                    "children": sub_children,
-                }
-            )
-        root_children.append(
+RUSSIAN_CONCEPTS: list[dict[str, Any]] = [
+    {
+        "term": "Фотосинтез",
+        "explanation": "Фотосинтез преобразует световую энергию в химическую.",
+        "evidence": "Photosynthesis converts light energy into chemical energy.",
+        "source_pages": [1],
+    },
+    {
+        "term": "Хлоропласты",
+        "explanation": "Фотосинтез происходит в хлоропластах и выделяет кислород.",
+        "evidence": "It occurs in chloroplasts and produces oxygen.",
+        "source_pages": [1],
+    },
+    {
+        "term": "Выделение кислорода",
+        "explanation": "Расщепление воды выделяет кислород как побочный продукт световых реакций.",
+        "evidence": "They split water and release oxygen.",
+        "source_pages": [2],
+    },
+    {
+        "term": "Световые реакции",
+        "explanation": "Световые реакции происходят в тилакоидной мембране и создают АТФ и НАДФН.",
+        "evidence": "Light reactions occur in the thylakoid membrane.",
+        "source_pages": [2],
+    },
+    {
+        "term": "Тилакоидная мембрана",
+        "explanation": "В тилакоидной мембране протекают световые реакции.",
+        "evidence": "Light reactions occur in the thylakoid membrane.",
+        "source_pages": [2],
+    },
+    {
+        "term": "Цикл Кальвина",
+        "explanation": "Цикл Кальвина фиксирует углекислый газ в глюкозу с использованием АТФ и НАДФН.",
+        "evidence": "The Calvin cycle fixes carbon dioxide into glucose.",
+        "source_pages": [2],
+    },
+    {
+        "term": "АТФ и НАДФН",
+        "explanation": "АТФ и НАДФН переносят энергию из световых реакций в цикл Кальвина.",
+        "evidence": "It uses ATP and NADPH produced by the light reactions.",
+        "source_pages": [2],
+    },
+    {
+        "term": "Глюкоза",
+        "explanation": "Цикл Кальвина производит глюкозу из углекислого газа.",
+        "evidence": "The Calvin cycle fixes carbon dioxide into glucose.",
+        "source_pages": [2],
+    },
+    {
+        "term": "Сельское хозяйство",
+        "explanation": "Исследования фотосинтеза помогают сельскому хозяйству и производству культур.",
+        "evidence": "Photosynthesis research informs agriculture and renewable energy.",
+        "source_pages": [3],
+    },
+    {
+        "term": "Искусственный фотосинтез",
+        "explanation": "Искусственный фотосинтез направлен на получение топлива из света.",
+        "evidence": "Artificial photosynthesis aims to produce fuels.",
+        "source_pages": [3],
+    },
+]
+
+
+def make_concepts(count: int = 10) -> dict[str, Any]:
+    return {"concepts": copy.deepcopy(DEFAULT_CONCEPTS[:count])}
+
+
+def make_russian_concepts(count: int = 10) -> dict[str, Any]:
+    return {"concepts": copy.deepcopy(RUSSIAN_CONCEPTS[:count])}
+
+
+def make_russian_cluster(concept_ids: list[str]) -> dict[str, Any]:
+    labels = ["Основные понятия", "Световые реакции", "Цикл Кальвина", "Применение"]
+    categories: list[dict[str, Any]] = []
+    count = min(4, max(1, len(concept_ids) // 2))
+    base, extra = divmod(len(concept_ids), count)
+    index = 0
+    for position in range(count):
+        take = base + (1 if position < extra else 0)
+        ids = concept_ids[index : index + take]
+        index += take
+        if not ids:
+            continue
+        categories.append(
             {
-                "label": f"Branch {index + 1}",
-                "summary": f"Main theme {index + 1} from the document.",
-                "source_pages": [page],
-                "children": branch_children,
+                "label": labels[position % len(labels)],
+                "groups": [{"label": "", "concept_ids": ids}],
             }
         )
+    return {"root_label": "Фотосинтез", "categories": categories}
+
+
+def make_cluster(concept_ids: list[str]) -> dict[str, Any]:
+    """Build a valid four-category cluster from IDs."""
+    if not concept_ids:
+        return {"root_label": "Photosynthesis", "categories": []}
+    categories: list[dict[str, Any]] = []
+    count = min(4, max(1, len(concept_ids) // 2))
+    base, extra = divmod(len(concept_ids), count)
+    index = 0
+    for position in range(count):
+        take = base + (1 if position < extra else 0)
+        ids = concept_ids[index : index + take]
+        index += take
+        if not ids:
+            continue
+        categories.append(
+            {
+                "label": CATEGORY_LABELS[position % len(CATEGORY_LABELS)],
+                "groups": [{"label": "", "concept_ids": ids}],
+            }
+        )
+    return {"root_label": "Photosynthesis", "categories": categories}
+
+
+def make_invalid_cluster(concept_ids: list[str]) -> dict[str, Any]:
+    """One category named like a document scaffold section (invalid)."""
     return {
-        "label": "Photosynthesis",
-        "summary": "The document explains photosynthesis and its applications.",
-        "source_pages": [1],
-        "children": root_children,
+        "root_label": "Photosynthesis",
+        "categories": [
+            {
+                "label": "Learning Objectives",
+                "groups": [{"label": "", "concept_ids": concept_ids}],
+            }
+        ],
     }
 
 
-CHUNK_RESPONSE: dict[str, Any] = {
-    "summary": "This chunk introduces photosynthesis and light reactions.",
-    "key_concepts": [
-        {"label": "Light energy", "summary": "Light energy is converted into chemical energy.", "source_pages": [1]},
-        {"label": "Oxygen release", "summary": "Water is split and oxygen is released.", "source_pages": [2]},
-        {"label": "Calvin cycle", "summary": "Carbon dioxide is fixed into glucose.", "source_pages": [2]},
-    ],
-    "key_terms": ["photosynthesis", "chloroplasts", "glucose", "oxygen"],
+def _inventory_ids(prompt: str) -> list[str]:
+    return re.findall(r"^- (c\d+) \|", prompt, re.MULTILINE)
+
+
+RU_LABEL_TRANSLATIONS = {
+    "Core Concepts": "Основные понятия",
+    "Light Reactions": "Световые реакции",
+    "Calvin Cycle": "Цикл Кальвина",
+    "Applications": "Применение",
+    "Overview": "Обзор",
+    "Details": "Детали",
+    "Examples": "Примеры",
+    "Additional": "Дополнительно",
+    "Further": "Далее",
+    "Context": "Контекст",
 }
+
+
+def _labels_from_translation_prompt(prompt: str) -> list[str]:
+    match = re.search(r"LABELS TO TRANSLATE:\s*\n(.*)", prompt, re.DOTALL)
+    if not match:
+        return []
+    labels: list[str] = []
+    for line in match.group(1).splitlines():
+        stripped = line.strip()
+        if stripped.startswith("- "):
+            labels.append(stripped[2:].strip())
+    return labels
+
+
+def _concept_ids_from_repair(prompt: str) -> list[dict[str, Any]]:
+    match = re.search(r"INVALID CONCEPTS:\s*<<<\s*(.*?)\s*>>>", prompt, re.DOTALL)
+    if not match:
+        return []
+    try:
+        return json.loads(match.group(1))
+    except json.JSONDecodeError:
+        return []
 
 
 class FakeLLMClient(LLMClient):
     """Scripted LLM: no network, deterministic responses, call recording."""
 
     provider = "fake"
-    model = "fake-model-v1"
+    model = "fake-model-v2"
 
     def __init__(
         self,
         *,
-        hierarchy_responses: list[dict[str, Any] | Exception] | None = None,
-        chunk_response: dict[str, Any] | None = None,
+        concept_responses: list[dict[str, Any] | Exception] | None = None,
+        cluster_responses: list[dict[str, Any] | Exception] | None = None,
+        concept_repair_responses: list[dict[str, Any] | Exception] | None = None,
+        cluster_repair_responses: list[dict[str, Any] | Exception] | None = None,
+        label_translation_responses: list[dict[str, Any] | Exception] | None = None,
         fail: bool = False,
     ) -> None:
-        self.hierarchy_responses = list(hierarchy_responses or [])
-        self.chunk_response = copy.deepcopy(chunk_response or CHUNK_RESPONSE)
+        self.concept_responses = list(concept_responses or [])
+        self.cluster_responses = list(cluster_responses or [])
+        self.concept_repair_responses = list(concept_repair_responses or [])
+        self.cluster_repair_responses = list(cluster_repair_responses or [])
+        self.label_translation_responses = list(label_translation_responses or [])
         self.fail = fail
         self.calls: list[dict[str, str]] = []
 
@@ -174,19 +379,78 @@ class FakeLLMClient(LLMClient):
         )
         if self.fail:
             raise LLMError("Simulated provider outage.")
-        if schema_name == "chunk_summary":
-            return copy.deepcopy(self.chunk_response)
-        if self.hierarchy_responses:
-            response = self.hierarchy_responses.pop(0)
-            if isinstance(response, Exception):
-                raise response
-            return copy.deepcopy(response)
-        return make_tree()
+
+        if schema_name == "concept_extraction":
+            if self.concept_responses:
+                response = self.concept_responses.pop(0)
+                if isinstance(response, Exception):
+                    raise response
+                return copy.deepcopy(response)
+            return make_concepts()
+
+        if schema_name == "cluster":
+            if self.cluster_responses:
+                response = self.cluster_responses.pop(0)
+                if isinstance(response, Exception):
+                    raise response
+                return copy.deepcopy(response)
+            return make_cluster(_inventory_ids(user_prompt))
+
+        if schema_name == "concept_repair":
+            if self.concept_repair_responses:
+                response = self.concept_repair_responses.pop(0)
+                if isinstance(response, Exception):
+                    raise response
+                return copy.deepcopy(response)
+            repaired = []
+            for card in _concept_ids_from_repair(user_prompt):
+                repaired.append(
+                    {
+                        "id": card.get("id", ""),
+                        "term": card.get("term", "Concept"),
+                        "explanation": card.get("evidence")
+                        or f"{card.get('term', 'The concept')} is explained in the source text.",
+                        "evidence": card.get("evidence", ""),
+                        "source_pages": card.get("source_pages") or [1],
+                    }
+                )
+            return {"concepts": repaired}
+
+        if schema_name == "cluster_repair":
+            if self.cluster_repair_responses:
+                response = self.cluster_repair_responses.pop(0)
+                if isinstance(response, Exception):
+                    raise response
+                return copy.deepcopy(response)
+            return make_cluster(_inventory_ids(user_prompt))
+
+        if schema_name == "label_translation":
+            if self.label_translation_responses:
+                response = self.label_translation_responses.pop(0)
+                if isinstance(response, Exception):
+                    raise response
+                return copy.deepcopy(response)
+            return {
+                "labels": [
+                    {
+                        "source": label,
+                        "translated": RU_LABEL_TRANSLATIONS.get(label, label),
+                    }
+                    for label in _labels_from_translation_prompt(user_prompt)
+                ]
+            }
+
+        return {}
 
 
 @pytest.fixture(scope="session")
 def sample_pdf_bytes() -> bytes:
     return build_sample_pdf()
+
+
+@pytest.fixture(scope="session")
+def objectives_pdf_bytes() -> bytes:
+    return build_objectives_pdf()
 
 
 @pytest.fixture(scope="session")

@@ -1,6 +1,11 @@
 /** Typed client for the mind map backend. */
 
-import type { GenerationOptions, JobResponse, MindMapResult } from '../types/mindmap';
+import type {
+  GenerationOptions,
+  HealthResponse,
+  JobResponse,
+  MindMapResult,
+} from '../types/mindmap';
 
 const RAW_BASE = import.meta.env.VITE_API_BASE_URL ?? '';
 export const API_BASE = RAW_BASE.replace(/\/$/, '');
@@ -34,6 +39,12 @@ async function readError(response: Response): Promise<ApiError> {
   return new ApiError(message, response.status, body?.error?.code ?? 'error');
 }
 
+export async function getHealth(signal?: AbortSignal): Promise<HealthResponse> {
+  const response = await fetch(`${API_BASE}/health`, { signal });
+  if (!response.ok) throw await readError(response);
+  return (await response.json()) as HealthResponse;
+}
+
 export async function createMindMap(
   file: File,
   options: GenerationOptions,
@@ -41,8 +52,6 @@ export async function createMindMap(
 ): Promise<{ job_id: string }> {
   const form = new FormData();
   form.append('file', file);
-  form.append('max_depth', String(options.maxDepth));
-  form.append('max_branches', String(options.maxBranches));
   if (options.language) {
     form.append('language', options.language);
   }
